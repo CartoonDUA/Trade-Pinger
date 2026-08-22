@@ -2,8 +2,10 @@
   "name": "social-trade-alerts",
   "version": "1.0.0",
   "private": true,
+  "main": "electron.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "electron .",
+    "web": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test"
   },
@@ -11,5 +13,8 @@
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "twilio": "^5.8.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6"
   }
 }

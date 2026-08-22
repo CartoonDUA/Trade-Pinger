@@ -3,68 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Social Trade Alerts</title>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <title>Trade-Pinger</title>
+  <link rel="preconnect" href="https://use.fontawesome.com" crossorigin>
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.7.2/css/all.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header>
-    <div>
-      <p class="eyebrow">LOCAL MONITOR</p>
-      <h1>Social Trade Alerts</h1>
-      <p>New posts to SMS, with trade proposals that only you can approve.</p>
-    </div>
-    <button id="pollButton"><i class="fa-solid fa-rotate"></i> Check now</button>
-  </header>
-
-  <main>
-    <section class="status-grid" id="statusCards"></section>
-
-    <section class="panel sources-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="eyebrow">WATCH LIST</p>
-          <h2>Sources</h2>
-        </div>
-        <span>Configured in .env</span>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark"><i class="fa-solid fa-bolt"></i></span><span>Trade-Pinger</span></div>
+      <nav>
+        <p class="nav-label">Monitor</p>
+        <button class="nav-item active" data-view="feed"><i class="fa-solid fa-satellite-dish"></i>Live feed</button>
+        <button class="nav-item" data-view="trade"><i class="fa-solid fa-arrow-right-arrow-left"></i>Trade proposal</button>
+        <button class="nav-item" data-view="sources"><i class="fa-solid fa-list"></i>Sources</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="liveDot" class="status-dot idle"></span>
+        <div><strong id="liveLabel">Waiting for setup</strong><span id="liveMode">Providers not connected</span></div>
       </div>
-      <div id="sources" class="sources"></div>
-    </section>
+    </aside>
 
-    <div class="columns">
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">LATEST ACTIVITY</p>
-            <h2>Recent posts</h2>
+    <section class="content">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Trade-Pinger</span><i class="fa-solid fa-chevron-right"></i><strong id="pageName">Live feed</strong></div>
+        <button id="pollButton" class="icon-button" title="Check X now"><i class="fa-solid fa-rotate"></i></button>
+      </header>
+
+      <div class="page-content">
+        <section id="feedView" class="view active">
+          <div class="page-heading"><div><p class="eyebrow">REAL-TIME MONITOR</p><h1>Incoming posts</h1><p>Posts appear here as soon as the configured official integrations deliver them.</p></div><div id="streamBadge" class="live-badge"><span></span>Local app live</div></div>
+          <div id="providerCards" class="provider-grid"></div>
+          <div class="stats" id="stats"></div>
+          <section class="component-card feed-card">
+            <div class="card-title"><div><span>Activity</span><h2>Recent posts</h2></div><code id="postCount">0 posts</code></div>
+            <div id="posts" class="posts"></div>
+          </section>
+        </section>
+
+        <section id="tradeView" class="view">
+          <div class="page-heading"><div><p class="eyebrow">PHANTOM REVIEW</p><h1>Trade proposal</h1><p>Prepare a proposal here, then approve its text directly in Phantom in your normal browser.</p></div></div>
+          <div class="two-column">
+            <section class="component-card">
+              <div class="card-title"><div><span>Proposal</span><h2>Review details</h2></div><code>No transaction</code></div>
+              <form id="proposalForm">
+                <label><span>Sell asset</span><input id="sellAsset" value="SOL" required></label>
+                <label><span>Amount</span><input id="amount" type="number" min="0" step="any" placeholder="0.00" required></label>
+                <label><span>Buy asset</span><input id="buyAsset" value="USDC" required></label>
+                <label><span>Maximum slippage (%)</span><input id="slippage" type="number" min="0" step="0.1" value="1" required></label>
+                <button class="button primary" type="submit"><i class="fa-solid fa-shield-halved"></i>Review in Phantom browser</button>
+              </form>
+            </section>
+            <section class="component-card proposal-card">
+              <div class="card-title"><div><span>Preview</span><h2>Unsigned proposal</h2></div><code>Local only</code></div>
+              <pre id="proposalPreview">Enter proposal details to preview them.</pre>
+              <div class="safety"><i class="fa-solid fa-lock"></i><div><strong>Your keys stay yours</strong><span>No recovery phrase or private key is requested. No transaction is built, submitted, broadcast, or automatically traded.</span></div></div>
+            </section>
           </div>
-        </div>
-        <div id="posts" class="posts"></div>
-      </section>
+        </section>
 
-      <section class="panel trade-panel">
-        <p class="eyebrow">PHANTOM REVIEW</p>
-        <h2>Trade proposal</h2>
-        <p class="muted">Create a proposal, review it, then sign the proposal text in Phantom. Signing does not create or submit a transaction.</p>
-
-        <button id="connectButton" class="secondary"><i class="fa-solid fa-wallet"></i> Connect Phantom</button>
-        <p id="walletStatus" class="wallet-status">Wallet not connected</p>
-
-        <form id="proposalForm">
-          <label>Sell<input id="sellAsset" value="SOL" required></label>
-          <label>Amount<input id="amount" type="number" min="0" step="any" placeholder="0.00" required></label>
-          <label>Buy<input id="buyAsset" value="USDC" required></label>
-          <label>Maximum slippage (%)<input id="slippage" type="number" min="0" step="0.1" value="1" required></label>
-          <button type="submit"><i class="fa-solid fa-signature"></i> Review and sign in Phantom</button>
-        </form>
-
-        <div id="proposalPreview" class="proposal-preview">Your proposal preview will appear here.</div>
-        <p class="safety"><i class="fa-solid fa-shield-halved"></i> This app never asks for a recovery phrase or private key, and never executes a trade.</p>
-      </section>
-    </div>
+        <section id="sourcesView" class="view">
+          <div class="page-heading"><div><p class="eyebrow">CONFIGURATION</p><h1>Monitored sources</h1><p>Source links and credentials remain in the local, Git-ignored .env file.</p></div></div>
+          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current sources</h2></div><code>.env</code></div><div id="sources" class="sources"></div></section>
+        </section>
+      </div>
+    </section>
   </main>
-
   <script src="/app.js"></script>
 </body>
 </html>
