@@ -51,16 +51,25 @@ function peerIds(entity) {
   return values;
 }
 
+function eventPeerId(event) {
+  if (event.chatId !== undefined && event.chatId !== null) return event.chatId.toString();
+  if (event.message?.chatId !== undefined && event.message.chatId !== null) return event.message.chatId.toString();
+  try { return getPeerId(event.message?.peerId).toString(); } catch { return null; }
+}
+
 class TelegramListener {
-  constructor({ sessionFile, onPost, onState, onSourceErrors }) {
+  constructor({ sessionFile, onPost, onState, onSourceErrors, onDiagnostics = () => {} }) {
     this.sessionFile = sessionFile;
     this.onPost = onPost;
     this.onState = onState;
     this.onSourceErrors = onSourceErrors;
+    this.onDiagnostics = onDiagnostics;
     this.client = null;
     this.startedAt = 0;
     this.qr = null;
     this.passwordRequest = null;
+    this.sources = [];
+    this.diagnostics = [];
   }
 
   sessionValue() {
@@ -151,15 +160,36 @@ class TelegramListener {
     }
     this.onSourceErrors(errors);
     this.startedAt = Date.now();
-    for (const source of sources) {
-      this.client.addEventHandler(event => this.newMessage(source, event), new NewMessage({ chats: [source.entity] }));
-    }
+    this.sources = sources;
+    this.diagnostics = sources.map(source => ({ source: source.input, registered: true, received: 0, accepted: 0, beforeStart: 0, lastReceivedAt: null, lastAcceptedAt: null }));
+    this.onDiagnostics(this.diagnostics);
+    this.client.addEventHandler(event => this.routeMessage(event), new NewMessage({}));
     this.onState({ connected: true, authorized: true, authorizing: false, message: sources.length ? `Listening to ${sources.length} source${sources.length === 1 ? '' : 's'}.` : 'Signed in; add an accessible source.' });
+  }
+
+  async routeMessage(event) {
+    const peerId = eventPeerId(event);
+    const source = this.sources.find(item => item.peerId === peerId);
+    if (!source) return;
+    const diagnostic = this.diagnostics.find(item => item.source === source.input);
+    diagnostic.received += 1;
+    diagnostic.lastReceivedAt = new Date().toISOString();
+    if (messageTime(event.message) < this.startedAt) {
+      diagnostic.beforeStart += 1;
+      this.onDiagnostics(this.diagnostics);
+      return;
+    }
+    const accepted = await this.newMessage(source, event);
+    if (accepted) {
+      diagnostic.accepted += 1;
+      diagnostic.lastAcceptedAt = new Date().toISOString();
+    }
+    this.onDiagnostics(this.diagnostics);
   }
 
   async newMessage(source, event) {
     const message = event.message;
-    if (messageTime(message) < this.startedAt) return;
+    if (messageTime(message) < this.startedAt) return false;
     const text = message.message || '[Media post]';
     const link = source.username ? `https://t.me/${source.username}/${message.id}` : '';
     let attachment = null;
@@ -168,13 +198,14 @@ class TelegramListener {
       const content = await this.client.downloadMedia(message.media, {});
       if (content?.length) attachment = { name: message.file?.name || `telegram-${message.id}${message.file?.ext || '.bin'}`, content };
     }
-    await this.onPost({
+    const accepted = await this.onPost({
       id: `telegram:${source.peerId || getPeerId(source.entity)}:${message.id}`,
       network: 'Telegram', source: source.label, text, link,
       createdAt: new Date(messageTime(message)).toISOString(),
       media: message.media ? { attached: Boolean(attachment), tooLarge: size > 8 * 1024 * 1024 } : null
     }, attachment);
     this.onState({ connected: true, authorized: true, lastSuccess: new Date().toISOString(), message: 'Listening for new Telegram posts.' });
+    return accepted !== false;
   }
 
   async check() {
@@ -199,4 +230,4 @@ class TelegramListener {
   }
 }
 
-module.exports = { TelegramListener, normalizeTelegramSource, messageTime };
+module.exports = { TelegramListener, normalizeTelegramSource, messageTime, eventPeerId };

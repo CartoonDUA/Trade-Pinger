@@ -46,7 +46,7 @@ let config = {
   notificationSound: saved.notificationSound !== false
 };
 let state = {
-  seen: [], posts: [], lastAlert: null, errors: [], sourceErrors: [],
+  seen: [], posts: [], lastAlert: null, errors: [], sourceErrors: [], listenerDiagnostics: [],
   telegram: { connected: false, authorized: false, authorizing: false, lastSuccess: null, message: 'Waiting for setup.' }
 };
 if (fs.existsSync(stateFile)) {
@@ -103,7 +103,8 @@ function statusPayload() {
   return {
     sources: config.telegramSources.map(source => {
       const error = state.sourceErrors.find(item => item.source === source);
-      return { network: 'Telegram', source, label: source, configured: configured().telegramSession, error: error?.message || null };
+      const diagnostic = state.listenerDiagnostics.find(item => item.source === source);
+      return { network: 'Telegram', source, label: source, configured: configured().telegramSession, error: error?.message || null, diagnostic: diagnostic || null };
     }),
     posts: state.posts,
     lastPoll: state.telegram.lastSuccess,
@@ -137,7 +138,7 @@ async function sendSms(post) {
 }
 
 async function addPost(post, attachment) {
-  if (state.seen.includes(post.id)) return;
+  if (state.seen.includes(post.id)) return false;
   state.seen.push(post.id);
   state.seen = state.seen.slice(-500);
   state.posts.unshift(post);
@@ -151,6 +152,7 @@ async function addPost(post, attachment) {
   state.errors = state.errors.slice(0, 8);
   saveJson(stateFile, state);
   publish();
+  return true;
 }
 
 const listener = new TelegramListener({
@@ -161,7 +163,8 @@ const listener = new TelegramListener({
     if (update.connected && !update.lastSuccess) state.telegram.lastSuccess = new Date().toISOString();
     publish();
   },
-  onSourceErrors: errors => { state.sourceErrors = errors; publish(); }
+  onSourceErrors: errors => { state.sourceErrors = errors; publish(); },
+  onDiagnostics: diagnostics => { state.listenerDiagnostics = diagnostics.map(item => ({ ...item })); publish(); }
 });
 
 async function restartTelegram() {

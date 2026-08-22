@@ -26,6 +26,8 @@ The saved session is a full account credential. Trade-Pinger keeps it in ignored
 
 Username sources are resolved through Telegram. Numeric dialog IDs are matched only against dialogs accessible to the signed-in account. Trade-Pinger does not scrape Telegram Web, join channels, use invite links to bypass access, or read inaccessible dialogs. Each inaccessible source gets its own visible error while accessible sources continue.
 
+The Sources view shows content-free listener diagnostics for each resolved source: handler registration, received-event count, and accepted-event count. Trade-Pinger uses one Telegram NewMessage subscription and routes updates by Telegram's canonical peer ID, avoiding mismatches between raw numeric Web dialog IDs and channel/group peer IDs. Diagnostics never contain message text, credentials, sessions, or webhook values.
+
 Monitoring begins after the live handlers are registered. Existing messages are not fetched or alerted. Newly delivered messages appear in Live Feed with their Telegram timestamp, source identity, full text, link when a public username permits one, and media status.
 
 ## Windows new-post alerts

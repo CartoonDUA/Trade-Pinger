@@ -29,7 +29,9 @@ function render(status) {
   document.querySelector('#sources').innerHTML = status.sources.length ? status.sources.map(source => {
     const link = sourceLink(source.source);
     const name = escapeHtml(source.source);
-    return `<div class="source"><span class="source-icon"><i class="fa-brands fa-telegram"></i></span>${link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : `<span>${name}</span>`}<small class="${source.error ? 'source-error' : source.configured ? 'ready' : ''}">${escapeHtml(source.error || (source.configured ? 'Accessible' : 'Needs authorization'))}</small></div>`;
+    const diagnostic = source.diagnostic;
+    const status = source.error || (diagnostic ? `Handler registered · received ${diagnostic.received} · accepted ${diagnostic.accepted}` : source.configured ? 'Resolving source' : 'Needs authorization');
+    return `<div class="source"><span class="source-icon"><i class="fa-brands fa-telegram"></i></span>${link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : `<span>${name}</span>`}<small class="${source.error ? 'source-error' : diagnostic?.registered ? 'ready' : ''}">${escapeHtml(status)}</small></div>`;
   }).join('') : '<div class="empty">No Telegram sources configured.</div>';
   renderMarkets(status.marketSnapshots || []);
   renderRisk(status.marketSnapshots || []);

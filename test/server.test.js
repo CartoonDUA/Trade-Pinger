@@ -30,16 +30,53 @@ test('multi-source listener registers live handlers without fetching history', a
   };
   listener.resolveSource = async value => ({ input: value, label: value, username: value.slice(1), entity: {}, peerId: value });
   await listener.listen(['@firstsource', '@secondsource']);
-  assert.equal(handlers.length, 2);
+  assert.equal(handlers.length, 1);
 });
 
 test('listener ignores messages dated before listening starts', async () => {
   const posts = [];
-  const listener = new TelegramListener({ sessionFile: 'unused', onPost: post => posts.push(post), onState() {}, onSourceErrors() {} });
+  const diagnostics = [];
+  const listener = new TelegramListener({ sessionFile: 'unused', onPost: post => posts.push(post), onState() {}, onSourceErrors() {}, onDiagnostics: value => diagnostics.push(value.map(item => ({ ...item }))) });
+  listener.sources = [{ input: '-4391365124', label: 'Numeric source', username: null, entity: {}, peerId: '-1004391365124' }];
+  listener.diagnostics = [{ source: '-4391365124', registered: true, received: 0, accepted: 0, beforeStart: 0, lastReceivedAt: null, lastAcceptedAt: null }];
   listener.startedAt = Date.now();
-  await listener.newMessage({ label: '@source', username: 'source', entity: {}, peerId: '1' }, { message: { id: 1, date: Math.floor(Date.now() / 1000) - 30, message: 'old', media: null } });
+  await listener.routeMessage({ chatId: { toString: () => '-1004391365124' }, message: { id: 1, date: Math.floor(Date.now() / 1000) - 30, message: 'old', media: null } });
   assert.equal(posts.length, 0);
+  assert.equal(diagnostics.at(-1)[0].beforeStart, 1);
   assert.ok(messageTime({ date: Math.floor(Date.now() / 1000) }) > 0);
+});
+
+test('canonical routing sends username and numeric events once to feed and Discord', async () => {
+  const feed = [];
+  const discord = [];
+  const seen = new Set();
+  const diagnostics = [];
+  const listener = new TelegramListener({
+    sessionFile: 'unused', onState() {}, onSourceErrors() {},
+    onDiagnostics: value => diagnostics.push(value.map(item => ({ ...item }))),
+    onPost: async post => {
+      if (seen.has(post.id)) return false;
+      seen.add(post.id);
+      feed.push(post);
+      discord.push(discordMessages(post));
+      return true;
+    }
+  });
+  listener.client = { addEventHandler(handler) { this.handler = handler; } };
+  listener.resolveSource = async value => value.startsWith('@')
+    ? { input: value, label: value, username: value.slice(1), entity: {}, peerId: '-100111' }
+    : { input: value, label: 'Numeric source', username: null, entity: {}, peerId: '-1004391365124' };
+  await listener.listen(['@firstsource', '-4391365124']);
+  listener.startedAt = Date.now() - 5000;
+  const message = (id, text) => ({ id, date: Math.floor(Date.now() / 1000), message: text, media: null });
+  await listener.client.handler({ chatId: { toString: () => '-100111' }, message: message(1, 'username post') });
+  await listener.client.handler({ chatId: { toString: () => '-1004391365124' }, message: message(2, 'numeric post') });
+  await listener.client.handler({ chatId: { toString: () => '-1004391365124' }, message: message(2, 'numeric duplicate') });
+  assert.deepEqual(feed.map(post => post.source), ['@firstsource', 'Numeric source']);
+  assert.equal(discord.length, 2);
+  assert.match(discord[1][0], /^@everyone/);
+  const latest = diagnostics.at(-1);
+  assert.deepEqual(latest.map(item => [item.received, item.accepted]), [[1, 1], [2, 1]]);
 });
 
 test('Discord forwarding intentionally pings everyone with full context', () => {
