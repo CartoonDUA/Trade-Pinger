@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
-const { discordMessages } = require('../discord-alert');
+const { discordPayloads, safePostLink, sendDiscord } = require('../discord-alert');
 const { TelegramListener, normalizeTelegramSource, messageTime } = require('../telegram-listener');
 
 test('legacy social provider is absent from application files', () => {
@@ -58,7 +58,7 @@ test('canonical routing sends username and numeric events once to feed and Disco
       if (seen.has(post.id)) return false;
       seen.add(post.id);
       feed.push(post);
-      discord.push(discordMessages(post));
+      discord.push(discordPayloads(post));
       return true;
     }
   });
@@ -74,20 +74,55 @@ test('canonical routing sends username and numeric events once to feed and Disco
   await listener.client.handler({ chatId: { toString: () => '-1004391365124' }, message: message(2, 'numeric duplicate') });
   assert.deepEqual(feed.map(post => post.source), ['@firstsource', 'Numeric source']);
   assert.equal(discord.length, 2);
-  assert.match(discord[1][0], /^@everyone/);
+  assert.equal(discord[1][0].content, '@everyone');
+  assert.equal(discord[1][0].embeds[0].description, 'numeric post');
   const latest = diagnostics.at(-1);
   assert.deepEqual(latest.map(item => [item.received, item.accepted]), [[1, 1], [2, 1]]);
 });
 
-test('Discord forwarding intentionally pings everyone with full context', () => {
-  const post = { source: '@source', createdAt: '2026-08-22T12:00:00.000Z', text: 'complete post text', link: 'https://t.me/source/7' };
-  const messages = discordMessages(post);
-  assert.match(messages[0], /^@everyone/);
-  assert.match(messages[0], /@source/);
-  assert.match(messages[0], /2026-08-22T12:00:00.000Z/);
-  assert.match(messages[0], /complete post text/);
-  assert.match(messages.at(-1), /https:\/\/t\.me\/source\/7/);
-  assert.deepEqual({ parse: ['everyone'] }, { parse: ['everyone'] });
+test('Discord rich embed pings everyone with safe post context', () => {
+  const post = { source: '@source', createdAt: '2026-08-22T12:00:00.000Z', text: 'complete post text', link: 'https://t.me/source/7', media: { attached: true } };
+  const payload = discordPayloads(post)[0];
+  assert.equal(payload.content, '@everyone');
+  assert.deepEqual(payload.allowed_mentions, { parse: ['everyone'] });
+  assert.equal(payload.embeds[0].title, 'New Telegram post · @source');
+  assert.equal(payload.embeds[0].description, 'complete post text');
+  assert.equal(payload.embeds[0].timestamp, '2026-08-22T12:00:00.000Z');
+  assert.equal(payload.embeds[0].url, 'https://t.me/source/7');
+  assert.deepEqual(payload.embeds[0].fields.map(field => field.name), ['Source', 'Provider', 'Media']);
+  assert.match(payload.embeds[0].fields[2].value, /attached/i);
+});
+
+test('Discord embeds preserve long text and reject unsafe links', () => {
+  const text = 'x'.repeat(9001);
+  const payloads = discordPayloads({ source: 'Private source', createdAt: 'invalid', text, link: 'https://example.com/not-telegram', media: { tooLarge: true } });
+  assert.equal(payloads.length, 3);
+  assert.equal(payloads.map(payload => payload.embeds[0].description).join(''), text);
+  assert.equal(payloads[0].content, '@everyone');
+  assert.equal(payloads[1].content, undefined);
+  assert.equal(payloads[0].embeds[0].url, undefined);
+  assert.equal(payloads[0].embeds[0].timestamp, undefined);
+  assert.match(payloads[0].embeds[0].fields[2].value, /8 MB/);
+  assert.equal(safePostLink('https://t.me/source/7'), 'https://t.me/source/7');
+  assert.equal(safePostLink('https://t.me/+private/7'), null);
+});
+
+test('Discord sender posts rich embeds without using a real webhook', async () => {
+  const requests = [];
+  const fetcher = async (url, options) => {
+    requests.push({ url, payload: JSON.parse(options.body) });
+    return { ok: true, status: 204 };
+  };
+  await sendDiscord('https://local.invalid/webhook', {
+    source: '@source',
+    createdAt: '2026-08-22T12:00:00.000Z',
+    text: 'new post',
+    link: 'https://t.me/source/8'
+  }, null, fetcher);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, 'https://local.invalid/webhook');
+  assert.equal(requests[0].payload.content, '@everyone');
+  assert.equal(requests[0].payload.embeds[0].description, 'new post');
 });
 
 test('local secrets and Telegram session are never returned by public config', () => {

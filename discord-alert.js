@@ -1,31 +1,53 @@
-function discordMessages(post) {
-  const header = `@everyone\n**New Telegram post from ${post.source}**\nTimestamp: ${post.createdAt}`;
-  const mediaNote = post.media?.tooLarge ? '\nMedia was larger than the 8 MB local forwarding limit.' : '';
-  const chunks = post.text.match(/[\s\S]{1,1750}/g) || ['[Media post]'];
-  return chunks.map((chunk, index) => {
-    const prefix = index === 0 ? `${header}\n\n` : '';
-    const link = index === chunks.length - 1 && post.link ? `\n\n${post.link}` : '';
-    return `${prefix}${chunk}${link}${index === chunks.length - 1 ? mediaNote : ''}`;
+function safePostLink(value) {
+  return /^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/\d+$/.test(value || '') ? value : null;
+}
+
+function mediaContext(post) {
+  if (!post.media) return 'No attachment';
+  if (post.media.tooLarge) return 'Telegram media exceeded the 8 MB local forwarding limit';
+  if (post.media.attached) return 'Telegram media attached to this alert';
+  return 'Telegram media was present but unavailable for forwarding';
+}
+
+function discordPayloads(post) {
+  const text = post.text || '[Media post]';
+  const chunks = text.match(/[\s\S]{1,4000}/g) || ['[Media post]'];
+  const timestamp = Number.isNaN(Date.parse(post.createdAt)) ? undefined : new Date(post.createdAt).toISOString();
+  const link = safePostLink(post.link);
+  return chunks.map((description, index) => {
+    const embed = {
+      title: `New Telegram post · ${post.source}`.slice(0, 256),
+      description,
+      color: 0x4ba0e8,
+      fields: index === 0 ? [
+        { name: 'Source', value: String(post.source || 'Telegram source').slice(0, 1024), inline: true },
+        { name: 'Provider', value: 'Telegram', inline: true },
+        { name: 'Media', value: mediaContext(post), inline: false }
+      ] : [],
+      footer: { text: chunks.length === 1 ? 'Trade-Pinger · New post' : `Trade-Pinger · Part ${index + 1} of ${chunks.length}` }
+    };
+    if (timestamp) embed.timestamp = timestamp;
+    if (index === 0 && link) embed.url = link;
+    return { content: index === 0 ? '@everyone' : undefined, allowed_mentions: { parse: ['everyone'] }, embeds: [embed] };
   });
 }
 
 async function sendDiscord(webhook, post, attachment, fetcher = fetch) {
   if (!webhook) return false;
-  const messages = discordMessages(post);
-  for (let index = 0; index < messages.length; index += 1) {
-    const payload = { content: messages[index], allowed_mentions: { parse: ['everyone'] } };
+  const payloads = discordPayloads(post);
+  for (let index = 0; index < payloads.length; index += 1) {
     let response;
     if (index === 0 && attachment) {
       const form = new FormData();
-      form.append('payload_json', JSON.stringify(payload));
+      form.append('payload_json', JSON.stringify(payloads[index]));
       form.append('files[0]', new Blob([attachment.content]), attachment.name);
       response = await fetcher(webhook, { method: 'POST', body: form });
     } else {
-      response = await fetcher(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      response = await fetcher(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloads[index]) });
     }
     if (!response.ok) throw new Error(`Discord webhook returned ${response.status}`);
   }
   return true;
 }
 
-module.exports = { discordMessages, sendDiscord };
+module.exports = { discordPayloads, safePostLink, sendDiscord };

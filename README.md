@@ -38,7 +38,7 @@ Windows Focus Assist, Do Not Disturb, per-app notification permissions, or disab
 
 ## Discord alerts
 
-Create a webhook for a Discord channel you control and save it under **Setup → Discord**. Each new monitored Telegram post intentionally includes `@everyone`, complete text split across messages when necessary, source, Telegram timestamp, public post link when available, and available media up to the app’s 8 MB forwarding limit. Discord availability and its own webhook limits still apply.
+Create a webhook for a Discord channel you control and save it under **Setup → Discord**. Each new monitored Telegram post intentionally includes `@everyone` followed by a rich embed with the source, Telegram timestamp, complete text, media context, and a validated public `t.me` post link when available. Long text is continued across additional rich embeds instead of being silently truncated. Available media up to the app’s 8 MB forwarding limit is attached to the first payload. Discord availability and its own webhook limits still apply.
 
 Webhook values are write-only. If a webhook was pasted into chat or exposed elsewhere, revoke it first and enter a regenerated replacement directly in Trade-Pinger.
 
