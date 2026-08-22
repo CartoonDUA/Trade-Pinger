@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Trade Alerts</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">LOCAL MONITOR</p>
+      <h1>Social Trade Alerts</h1>
+      <p>New posts to SMS, with trade proposals that only you can approve.</p>
+    </div>
+    <button id="pollButton"><i class="fa-solid fa-rotate"></i> Check now</button>
+  </header>
+
+  <main>
+    <section class="status-grid" id="statusCards"></section>
+
+    <section class="panel sources-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">WATCH LIST</p>
+          <h2>Sources</h2>
+        </div>
+        <span>Configured in .env</span>
+      </div>
+      <div id="sources" class="sources"></div>
+    </section>
+
+    <div class="columns">
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">LATEST ACTIVITY</p>
+            <h2>Recent posts</h2>
+          </div>
+        </div>
+        <div id="posts" class="posts"></div>
+      </section>
+
+      <section class="panel trade-panel">
+        <p class="eyebrow">PHANTOM REVIEW</p>
+        <h2>Trade proposal</h2>
+        <p class="muted">Create a proposal, review it, then sign the proposal text in Phantom. Signing does not create or submit a transaction.</p>
+
+        <button id="connectButton" class="secondary"><i class="fa-solid fa-wallet"></i> Connect Phantom</button>
+        <p id="walletStatus" class="wallet-status">Wallet not connected</p>
+
+        <form id="proposalForm">
+          <label>Sell<input id="sellAsset" value="SOL" required></label>
+          <label>Amount<input id="amount" type="number" min="0" step="any" placeholder="0.00" required></label>
+          <label>Buy<input id="buyAsset" value="USDC" required></label>
+          <label>Maximum slippage (%)<input id="slippage" type="number" min="0" step="0.1" value="1" required></label>
+          <button type="submit"><i class="fa-solid fa-signature"></i> Review and sign in Phantom</button>
+        </form>
+
+        <div id="proposalPreview" class="proposal-preview">Your proposal preview will appear here.</div>
+        <p class="safety"><i class="fa-solid fa-shield-halved"></i> This app never asks for a recovery phrase or private key, and never executes a trade.</p>
+      </section>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
