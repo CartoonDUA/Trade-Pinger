@@ -95,3 +95,16 @@ test('Electron alert uses a safe preview, optional sound, and click-to-focus', (
   assert.match(desktop, /notification\.on\('click'/);
   assert.match(desktop, /window\.focus\(\)/);
 });
+
+test('CYBERLEEK uses factual DEX fields and neutral risk language', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  const client = fs.readFileSync('public/app.js', 'utf8');
+  const setup = fs.readFileSync('public/index.html', 'utf8');
+  assert.match(setup, /ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg/);
+  for (const field of ['change5m', 'change1h', 'change6h', 'change24h', 'volume24h', 'liquidityUsd', 'marketCap', 'fdv', 'pairCreatedAt', 'dex', 'updatedAt']) {
+    assert.match(`${server}\n${client}`, new RegExp(field));
+  }
+  assert.match(server, /api\.dexscreener\.com/);
+  assert.match(setup, /not financial advice/i);
+  assert.doesNotMatch(`${server}\n${client}\n${setup}`, /should (buy|sell)|recommended position|increase profit|AI prediction/i);
+});

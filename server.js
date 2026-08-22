@@ -174,7 +174,9 @@ function marketView(coin, pair) {
   if (!pair) return { coin, error: 'No Solana DEX pair found', updatedAt: new Date().toISOString() };
   return {
     coin, symbol: pair.baseToken?.symbol || coin, name: pair.baseToken?.name || '', priceUsd: pair.priceUsd || null,
-    change24h: pair.priceChange?.h24 ?? null, volume24h: pair.volume?.h24 ?? null, liquidityUsd: pair.liquidity?.usd ?? null,
+    change5m: pair.priceChange?.m5 ?? null, change1h: pair.priceChange?.h1 ?? null,
+    change6h: pair.priceChange?.h6 ?? null, change24h: pair.priceChange?.h24 ?? null,
+    volume24h: pair.volume?.h24 ?? null, liquidityUsd: pair.liquidity?.usd ?? null,
     marketCap: pair.marketCap ?? null, fdv: pair.fdv ?? null, pairCreatedAt: pair.pairCreatedAt ?? null,
     dex: pair.dexId || null, pairUrl: pair.url || null, updatedAt: new Date().toISOString()
   };

@@ -80,7 +80,11 @@ function pairAge(value) {
 
 function renderMarkets(markets) {
   const target = document.querySelector('#marketSnapshots');
-  target.innerHTML = markets.length ? markets.map(market => market.error ? `<article class="market-card"><strong>${escapeHtml(market.coin)}</strong><span class="market-error">${escapeHtml(market.error)}</span><small>Updated ${dateTime(market.updatedAt)}</small></article>` : `<article class="market-card"><div><strong>${escapeHtml(market.symbol)}</strong><span>${escapeHtml(market.name)} · ${escapeHtml(market.dex || 'DEX')}</span></div><dl><div><dt>Price</dt><dd>${money(market.priceUsd)}</dd></div><div><dt>24h change</dt><dd>${market.change24h === null ? 'Unavailable' : `${market.change24h}%`}</dd></div><div><dt>24h volume</dt><dd>${money(market.volume24h)}</dd></div><div><dt>Liquidity</dt><dd>${money(market.liquidityUsd)}</dd></div><div><dt>Market cap / FDV</dt><dd>${money(market.marketCap)} / ${money(market.fdv)}</dd></div><div><dt>Pair age</dt><dd>${pairAge(market.pairCreatedAt)}</dd></div></dl><small>Updated ${dateTime(market.updatedAt)}</small></article>`).join('') : '<p class="market-empty">Add a coin to load a public market snapshot.</p>';
+  target.innerHTML = markets.length ? markets.map(market => market.error ? `<article class="market-card"><strong>${escapeHtml(market.coin)}</strong><span class="market-error">${escapeHtml(market.error)}</span><small>Updated ${dateTime(market.updatedAt)}</small></article>` : `<article class="market-card"><div><strong>${escapeHtml(market.symbol)}</strong><span>${escapeHtml(market.name)} · ${escapeHtml(market.dex || 'DEX')}</span></div><dl><div><dt>Price</dt><dd>${money(market.priceUsd)}</dd></div><div><dt>5m / 1h change</dt><dd>${percentage(market.change5m)} / ${percentage(market.change1h)}</dd></div><div><dt>6h / 24h change</dt><dd>${percentage(market.change6h)} / ${percentage(market.change24h)}</dd></div><div><dt>24h volume</dt><dd>${money(market.volume24h)}</dd></div><div><dt>Liquidity</dt><dd>${money(market.liquidityUsd)}</dd></div><div><dt>Market cap / FDV</dt><dd>${money(market.marketCap)} / ${money(market.fdv)}</dd></div><div><dt>Pair age</dt><dd>${pairAge(market.pairCreatedAt)}</dd></div></dl><small>Updated ${dateTime(market.updatedAt)}</small></article>`).join('') : '<p class="market-empty">Add a coin to load a public market snapshot.</p>';
+}
+
+function percentage(value) {
+  return value === null || value === undefined ? 'Unavailable' : `${value}%`;
 }
 
 function renderRisk(markets) {

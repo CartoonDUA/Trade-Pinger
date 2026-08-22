@@ -46,6 +46,8 @@ Twilio SMS remains optional. Save an account SID, auth token, sending number, an
 
 The Market setup accepts coin symbols or Solana token addresses and reads neutral snapshots from the documented public [DEX Screener API](https://docs.dexscreener.com/api/reference). The proposal view flags only observable conditions such as missing data, low liquidity, large recent price movement, or a young pair. It does not provide recommendations, personalized advice, or position sizes.
 
+CYBERLEEK can be tracked with the Solana token address `ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg`. Its snapshot displays current price; 5-minute, 1-hour, 6-hour, and 24-hour changes; 24-hour volume; liquidity; market cap and FDV; pair age; DEX; and update time when the public API provides them. Missing or rate-limited data is labeled instead of estimated. This is factual market information, not financial advice or a prediction.
+
 ## Phantom boundary
 
 The proposal screen opens the normal system browser. The user connects Phantom there and explicitly approves a signature over the displayed human-readable proposal. No transaction is built or sent, and the signature is not an automated trade instruction.
