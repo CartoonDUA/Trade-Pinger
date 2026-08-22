@@ -59,7 +59,7 @@ test('local secrets and Telegram session are never returned by public config', (
   const publicConfig = server.match(/function publicConfig\(\) \{([\s\S]*?)\n\}/)[1];
   assert.doesNotMatch(publicConfig, /telegramApiHash:\s*config|discordWebhookUrl:\s*config|telegram\.session/);
   assert.match(server, /dataDir, 'telegram\.session'/);
-  assert.match(server, /saveJson\(configFile, \{ telegramApiId: config\.telegramApiId, telegramSources: config\.telegramSources, coinWatchlist: config\.coinWatchlist \}\)/);
+  assert.match(server, /desktopNotifications: config\.desktopNotifications, notificationSound: config\.notificationSound/);
   assert.match(secrets, /safeStorage\.encryptString/);
   assert.match(secrets, /safeStorage\.decryptString/);
   assert.match(fs.readFileSync('.gitignore', 'utf8'), /^data\/$/m);
@@ -77,4 +77,21 @@ test('desktop keeps its secure preload boundary and persisted themes', () => {
   assert.match(desktop, /contextIsolation: true/);
   assert.match(desktop, /nodeIntegration: false/);
   assert.match(client, /localStorage\.setItem\('tradePingerTheme'/);
+});
+
+test('new-post desktop alerts are guarded by deduplication and listener cutoff', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  const listener = fs.readFileSync('telegram-listener.js', 'utf8');
+  const addPost = server.match(/async function addPost[\s\S]*?\n\}/)[0];
+  assert.ok(addPost.indexOf('state.seen.includes(post.id)') < addPost.indexOf('tradePingerDesktopAlert'));
+  assert.match(listener, /if \(messageTime\(message\) < this\.startedAt\) return/);
+});
+
+test('Electron alert uses a safe preview, optional sound, and click-to-focus', () => {
+  const desktop = fs.readFileSync('electron.js', 'utf8');
+  assert.match(desktop, /Notification\.isSupported\(\)/);
+  assert.match(desktop, /slice\(0, 140\)/);
+  assert.match(desktop, /if \(settings\.sound\) shell\.beep\(\)/);
+  assert.match(desktop, /notification\.on\('click'/);
+  assert.match(desktop, /window\.focus\(\)/);
 });

@@ -41,7 +41,9 @@ let config = {
   twilioAuthToken: localSecrets.twilioAuthToken || saved.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN || '',
   twilioFromNumber: localSecrets.twilioFromNumber || saved.twilioFromNumber || process.env.TWILIO_FROM_NUMBER || '',
   smsToNumber: localSecrets.smsToNumber || saved.smsToNumber || process.env.SMS_TO_NUMBER || '',
-  coinWatchlist: saved.coinWatchlist || []
+  coinWatchlist: saved.coinWatchlist || [],
+  desktopNotifications: saved.desktopNotifications !== false,
+  notificationSound: saved.notificationSound !== false
 };
 let state = {
   seen: [], posts: [], lastAlert: null, errors: [], sourceErrors: [],
@@ -63,7 +65,10 @@ function saveJson(file, value) {
 }
 
 function saveConfig() {
-  saveJson(configFile, { telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, coinWatchlist: config.coinWatchlist });
+  saveJson(configFile, {
+    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, coinWatchlist: config.coinWatchlist,
+    desktopNotifications: config.desktopNotifications, notificationSound: config.notificationSound
+  });
   secretStore.save({
     telegramApiHash: config.telegramApiHash, discordWebhookUrl: config.discordWebhookUrl,
     twilioAccountSid: config.twilioAccountSid, twilioAuthToken: config.twilioAuthToken,
@@ -88,7 +93,10 @@ function configured() {
 }
 
 function publicConfig() {
-  return { telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, coinWatchlist: config.coinWatchlist, configured: configured() };
+  return {
+    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, coinWatchlist: config.coinWatchlist,
+    desktopNotifications: config.desktopNotifications, notificationSound: config.notificationSound, configured: configured()
+  };
 }
 
 function statusPayload() {
@@ -134,6 +142,7 @@ async function addPost(post, attachment) {
   state.seen = state.seen.slice(-500);
   state.posts.unshift(post);
   state.posts = state.posts.slice(0, 50);
+  global.tradePingerDesktopAlert?.(post, { desktop: config.desktopNotifications, sound: config.notificationSound });
   const alerts = await Promise.allSettled([sendSms(post), sendDiscord(config.discordWebhookUrl, post, attachment)]);
   if (alerts.some(result => result.status === 'fulfilled' && result.value)) state.lastAlert = new Date().toISOString();
   for (const result of alerts) {
@@ -215,7 +224,9 @@ app.post('/api/config', async (request, response) => {
       ...config,
       telegramApiId: String(input.telegramApiId ?? config.telegramApiId).trim(),
       telegramSources: [...new Set((input.telegramSources || []).map(normalizeTelegramSource))],
-      coinWatchlist: [...new Set((input.coinWatchlist || []).map(normalizeCoin))]
+      coinWatchlist: [...new Set((input.coinWatchlist || []).map(normalizeCoin))],
+      desktopNotifications: input.desktopNotifications !== false,
+      notificationSound: input.notificationSound !== false
     };
     if (next.telegramApiId && !/^\d+$/.test(next.telegramApiId)) throw new Error('Telegram API ID must contain only digits.');
     if (next.telegramSources.length > 50) throw new Error('Telegram monitoring supports up to 50 sources.');

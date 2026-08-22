@@ -28,6 +28,12 @@ Username sources are resolved through Telegram. Numeric dialog IDs are matched o
 
 Monitoring begins after the live handlers are registered. Existing messages are not fetched or alerted. Newly delivered messages appear in Live Feed with their Telegram timestamp, source identity, full text, link when a public username permits one, and media status.
 
+## Windows new-post alerts
+
+**Setup → Alerts** controls native desktop notifications and the local notification sound. Both default on. Each genuinely new post can show the source and a whitespace-normalized preview limited to 140 characters; clicking the notification focuses Trade-Pinger when Windows supports the action. The existing listener-start cutoff and seen-message ID guard prevent startup history and duplicate events from producing repeated desktop alerts.
+
+Windows Focus Assist, Do Not Disturb, per-app notification permissions, or disabled system sounds can suppress notification banners or sound even while Trade-Pinger is listening normally.
+
 ## Discord alerts
 
 Create a webhook for a Discord channel you control and save it under **Setup → Discord**. Each new monitored Telegram post intentionally includes `@everyone`, complete text split across messages when necessary, source, Telegram timestamp, public post link when available, and available media up to the app’s 8 MB forwarding limit. Discord availability and its own webhook limits still apply.

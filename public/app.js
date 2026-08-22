@@ -48,6 +48,8 @@ function renderSetup() {
   document.querySelector('#telegramConfigured').textContent = setupConfig.configured.telegramSession ? 'Authorized' : setupConfig.configured.telegram ? 'Credentials saved' : 'Not configured';
   document.querySelector('#twilioConfigured').textContent = setupConfig.configured.twilio ? 'Configured' : 'Not configured';
   document.querySelector('#discordConfigured').textContent = setupConfig.configured.discord ? 'Configured' : 'Not configured';
+  document.querySelector('#desktopNotifications').checked = setupConfig.desktopNotifications !== false;
+  document.querySelector('#notificationSound').checked = setupConfig.notificationSound !== false;
   const secretFields = ['telegramApiHash', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl'];
   secretFields.forEach(id => {
     const input = document.querySelector(`#${id}`);
@@ -141,6 +143,8 @@ document.querySelector('#setupForm').addEventListener('submit', async event => {
     telegramApiHash: document.querySelector('#telegramApiHash').value,
     telegramSources: setupConfig.telegramSources,
     coinWatchlist: setupConfig.coinWatchlist,
+    desktopNotifications: document.querySelector('#desktopNotifications').checked,
+    notificationSound: document.querySelector('#notificationSound').checked,
     twilioAccountSid: document.querySelector('#twilioAccountSid').value,
     twilioAuthToken: document.querySelector('#twilioAuthToken').value,
     twilioFromNumber: document.querySelector('#twilioFromNumber').value,

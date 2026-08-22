@@ -1,9 +1,23 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, shell } = require('electron');
 const path = require('path');
 
 let window;
 
+function desktopAlert(post, settings) {
+  if (settings.sound) shell.beep();
+  if (!settings.desktop || !Notification.isSupported()) return;
+  const preview = String(post.text || '[Media post]').replace(/\s+/g, ' ').trim().slice(0, 140);
+  const notification = new Notification({ title: `New post from ${post.source}`, body: preview, silent: true });
+  notification.on('click', () => {
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+  });
+  notification.show();
+}
+
 function createWindow() {
+  global.tradePingerDesktopAlert = desktopAlert;
   require('./server');
   window = new BrowserWindow({
     width: 1280,
@@ -20,5 +34,8 @@ function createWindow() {
 }
 
 ipcMain.handle('open-external', (event, url) => shell.openExternal(url));
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  app.setAppUserModelId('CartoonDUA.TradePinger');
+  createWindow();
+});
 app.on('window-all-closed', () => app.quit());
