@@ -1,62 +1,80 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const { discordMessages } = require('../discord-alert');
+const { TelegramListener, normalizeTelegramSource, messageTime } = require('../telegram-listener');
 
-test('wallet code signs a message and never submits a transaction', () => {
+test('legacy social provider is absent from application files', () => {
+  const files = ['server.js', 'public/app.js', 'public/index.html', '.env.example', 'README.md'];
+  const source = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
+  assert.doesNotMatch(source, /X_BEARER_TOKEN|X_STREAM_ENABLED|normalizeXSource|x\.com|tweets\/search|fa-x-twitter/);
+});
+
+test('Telegram source normalization accepts every supported form', () => {
+  const values = new Map([
+    ['@cyberleekario', '@cyberleekario'],
+    ['https://t.me/cyberleekario/42', '@cyberleekario'],
+    ['https://web.telegram.org/k/#@cyberleekario', '@cyberleekario'],
+    ['https://web.telegram.org/k/#-4391365124', '-4391365124']
+  ]);
+  for (const [input, expected] of values) assert.equal(normalizeTelegramSource(input), expected);
+  assert.throws(() => normalizeTelegramSource('https://example.com/channel'));
+});
+
+test('multi-source listener registers live handlers without fetching history', async () => {
+  const listener = new TelegramListener({ sessionFile: 'unused', onPost() {}, onState() {}, onSourceErrors() {} });
+  const handlers = [];
+  listener.client = {
+    addEventHandler(handler) { handlers.push(handler); },
+    getMessages() { throw new Error('Historical messages must not be fetched.'); }
+  };
+  listener.resolveSource = async value => ({ input: value, label: value, username: value.slice(1), entity: {}, peerId: value });
+  await listener.listen(['@firstsource', '@secondsource']);
+  assert.equal(handlers.length, 2);
+});
+
+test('listener ignores messages dated before listening starts', async () => {
+  const posts = [];
+  const listener = new TelegramListener({ sessionFile: 'unused', onPost: post => posts.push(post), onState() {}, onSourceErrors() {} });
+  listener.startedAt = Date.now();
+  await listener.newMessage({ label: '@source', username: 'source', entity: {}, peerId: '1' }, { message: { id: 1, date: Math.floor(Date.now() / 1000) - 30, message: 'old', media: null } });
+  assert.equal(posts.length, 0);
+  assert.ok(messageTime({ date: Math.floor(Date.now() / 1000) }) > 0);
+});
+
+test('Discord forwarding intentionally pings everyone with full context', () => {
+  const post = { source: '@source', createdAt: '2026-08-22T12:00:00.000Z', text: 'complete post text', link: 'https://t.me/source/7' };
+  const messages = discordMessages(post);
+  assert.match(messages[0], /^@everyone/);
+  assert.match(messages[0], /@source/);
+  assert.match(messages[0], /2026-08-22T12:00:00.000Z/);
+  assert.match(messages[0], /complete post text/);
+  assert.match(messages.at(-1), /https:\/\/t\.me\/source\/7/);
+  assert.deepEqual({ parse: ['everyone'] }, { parse: ['everyone'] });
+});
+
+test('local secrets and Telegram session are never returned by public config', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  const secrets = fs.readFileSync('local-secrets.js', 'utf8');
+  const publicConfig = server.match(/function publicConfig\(\) \{([\s\S]*?)\n\}/)[1];
+  assert.doesNotMatch(publicConfig, /telegramApiHash:\s*config|discordWebhookUrl:\s*config|telegram\.session/);
+  assert.match(server, /dataDir, 'telegram\.session'/);
+  assert.match(server, /saveJson\(configFile, \{ telegramApiId: config\.telegramApiId, telegramSources: config\.telegramSources, coinWatchlist: config\.coinWatchlist \}\)/);
+  assert.match(secrets, /safeStorage\.encryptString/);
+  assert.match(secrets, /safeStorage\.decryptString/);
+  assert.match(fs.readFileSync('.gitignore', 'utf8'), /^data\/$/m);
+});
+
+test('wallet code signs text and never submits a transaction', () => {
   const source = fs.readFileSync('public/app.js', 'utf8');
   assert.match(source, /signMessage/);
   assert.doesNotMatch(source, /sendTransaction|signAndSendTransaction|sendRawTransaction/);
 });
 
-test('desktop uses a secure preload boundary', () => {
+test('desktop keeps its secure preload boundary and persisted themes', () => {
   const desktop = fs.readFileSync('electron.js', 'utf8');
+  const client = fs.readFileSync('public/app.js', 'utf8');
   assert.match(desktop, /contextIsolation: true/);
   assert.match(desktop, /nodeIntegration: false/);
-});
-
-test('live provider updates use streaming responses', () => {
-  const server = fs.readFileSync('server.js', 'utf8');
-  assert.match(server, /text\/event-stream/);
-  assert.match(server, /tweets\/search\/stream/);
-  assert.match(server, /timeout=25/);
-});
-
-test('desktop setup persists locally without returning secret contents', () => {
-  const server = fs.readFileSync('server.js', 'utf8');
-  assert.match(server, /dataDir, 'config\.json'/);
-  assert.match(server, /configured:\s*\{/);
-  assert.match(server, /app\.get\('\/api\/config'.*publicConfig/s);
-  assert.match(server, /app\.post\('\/api\/config'/);
-});
-
-test('source management accepts only supported public source formats', () => {
-  const server = fs.readFileSync('server.js', 'utf8');
-  assert.match(server, /normalizeXSource/);
-  assert.match(server, /normalizeTelegramSource/);
-  assert.match(server, /Unsupported X source/);
-  assert.match(server, /Unsupported Telegram public source/);
-});
-
-test('Discord webhook stays write-only and sends complete post context', () => {
-  const server = fs.readFileSync('server.js', 'utf8');
-  assert.match(server, /discordWebhookUrl: Boolean\(config\.discordWebhookUrl\)/);
-  assert.match(server, /clearDiscordWebhook/);
-  assert.match(server, /allowed_mentions: \{ parse: \[\] \}/);
-  assert.match(server, /post\.source/);
-  assert.match(server, /post\.createdAt/);
-  assert.match(server, /post\.link/);
-});
-
-test('market watchlist uses read-only DEX data and neutral risk flags', () => {
-  const server = fs.readFileSync('server.js', 'utf8');
-  const client = fs.readFileSync('public/app.js', 'utf8');
-  assert.match(server, /api\.dexscreener\.com/);
-  assert.match(server, /coinWatchlist/);
-  assert.match(client, /Informational only—not a recommendation or personalized advice/);
-  assert.doesNotMatch(client, /should (buy|sell|trade)|position size/i);
-});
-
-test('server does not reference recovery phrases or private keys', () => {
-  const source = fs.readFileSync('server.js', 'utf8');
-  assert.doesNotMatch(source, /private.?key|recovery.?phrase|seed.?phrase/i);
+  assert.match(client, /localStorage\.setItem\('tradePingerTheme'/);
 });

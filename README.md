@@ -1,74 +1,56 @@
 # Trade-Pinger
 
-A user-owned Windows desktop monitor for configured X and Telegram sources. New posts appear in the live feed and can be sent with their full text and link through Twilio SMS. The desktop app also prepares human-readable trade proposals for explicit approval in Phantom.
+Trade-Pinger is a user-owned Windows desktop app for personal-account Telegram channel monitoring, Discord and optional SMS alerts, neutral Solana market snapshots, and human-reviewed Phantom proposals.
 
-Trade-Pinger never requests, stores, or transmits a recovery phrase or private key. It never constructs, submits, broadcasts, or automatically executes a trade transaction.
+It never asks for a wallet recovery phrase or private key. It never creates, submits, broadcasts, or automatically executes a trade.
 
 ## Run on Windows
 
-1. Install Node.js 20 or newer.
-2. Install dependencies and launch the desktop app:
+Install Node.js 20 or newer, then run:
 
-   ```powershell
-   npm install
-   npm start
-   ```
+```powershell
+npm install
+npm start
+```
 
-The Electron desktop window starts its own local service at `http://localhost:3000`. Open **Setup** in the left rail to add sources and configure providers; ordinary setup does not require editing `.env`. Use `npm run web` only when you specifically want the browser version.
+Electron starts the local service at `http://localhost:3000`. Runtime files are stored under the ignored `data/` directory. API hashes, webhook URLs, and phone values use Electron's operating-system-protected local encryption; the Telegram session is a write-only local credential. None of these values is returned to the UI, committed, or sent through chat.
 
-Runtime state is saved in the ignored `data/state.json`. Setup values are saved in the ignored `data/config.json`. Provider tokens and phone values are write-only in the UI: after saving, the app reports only whether each value is configured and never returns its contents to the dashboard. `.env` remains available for initial/default values but is not needed for normal desktop setup.
+## Personal Telegram setup
 
-## Desktop setup
+1. Sign in at [my.telegram.org](https://my.telegram.org), open **API development tools**, and create an application to obtain an API ID and API hash.
+2. In **Setup → Telegram**, enter the API ID and API hash, then save setup locally.
+3. In **Setup → Sources**, add channels with `@username`, a `t.me` link, a username Telegram Web link, or a numeric Telegram Web dialog link.
+4. Return to **Telegram**, select **Authorize with QR**, and scan the QR in the official Telegram mobile app under **Settings → Devices → Link Desktop Device**. If Telegram requires two-step verification, enter that password directly in the local app.
 
-1. Open **Setup** in the fixed side rail.
-2. Add or remove supported X handles/profile links and Telegram public channel handles/links.
-3. Paste official provider credentials or a regenerated Discord webhook directly into the local form. Never send them through chat.
-4. Choose X streaming only if the X API tier supports filtered streams, then select **Save setup locally**.
-5. Return to **Live feed** to see connection state, the exact last successful provider check, and the exact last SMS alert time.
+The saved session is a full account credential. Trade-Pinger keeps it in ignored local storage, never returns it through its API, and provides **Sign out locally** to terminate and remove it. You can also terminate the session from Telegram’s official Devices screen.
 
-Saving restarts the local monitors immediately. Secret fields become blank again and show only a “saved locally” placeholder. Source and credential changes under `data/` are runtime-only and must not be committed.
+Username sources are resolved through Telegram. Numeric dialog IDs are matched only against dialogs accessible to the signed-in account. Trade-Pinger does not scrape Telegram Web, join channels, use invite links to bypass access, or read inaccessible dialogs. Each inaccessible source gets its own visible error while accessible sources continue.
 
-The Setup area also includes a local coin watchlist. Add a coin symbol or Solana token address under **Market** to load a neutral snapshot from the documented public [DEX Screener API](https://docs.dexscreener.com/api/reference). Snapshots show price, 24-hour change and volume, liquidity, market cap/FDV, pair age, and update time when the API provides them. The app refreshes once per minute and reports unavailable or rate-limited data instead of inventing values.
+Monitoring begins after the live handlers are registered. Existing messages are not fetched or alerted. Newly delivered messages appear in Live Feed with their Telegram timestamp, source identity, full text, link when a public username permits one, and media status.
 
-## Live delivery modes
+## Discord alerts
 
-- **X polling (default):** official API v2 recent search every 15 seconds. The app labels this as polling and does not claim instant delivery.
-- **X filtered stream:** set `X_STREAM_ENABLED=true` only when the configured X API access tier supports filtered streams. Trade-Pinger installs rules tagged `trade-pinger:*` for the configured profiles, connects to the official filtered-stream endpoint, and reconnects after interruptions.
-- **Telegram long polling:** the user-controlled bot keeps an official Bot API `getUpdates` request open for up to 25 seconds at a time. New matching channel posts are added as soon as Telegram returns them.
-- **Desktop updates:** the local service pushes status and new posts to the desktop window with server-sent events, without a UI refresh interval.
+Create a webhook for a Discord channel you control and save it under **Setup → Discord**. Each new monitored Telegram post intentionally includes `@everyone`, complete text split across messages when necessary, source, Telegram timestamp, public post link when available, and available media up to the app’s 8 MB forwarding limit. Discord availability and its own webhook limits still apply.
 
-The dashboard shows each provider's configured delivery mode, current connection state, exact last successful provider check, and exact last SMS alert time.
+Webhook values are write-only. If a webhook was pasted into chat or exposed elsewhere, revoke it first and enter a regenerated replacement directly in Trade-Pinger.
 
-## X setup
+## Optional SMS and market data
 
-Create a developer project at the [X Developer Portal](https://developer.x.com/) with official API v2 access. Enter the following in the desktop Setup tab:
+Twilio SMS remains optional. Save an account SID, auth token, sending number, and destination in **Setup → SMS**. Long content can use multiple paid SMS segments.
 
-- `X_BEARER_TOKEN`
-- `X_SOURCES` as comma-separated profile links
-- `X_STREAM_ENABLED=false` for recent-search polling, or `true` when the API tier supports filtered streams
+The Market setup accepts coin symbols or Solana token addresses and reads neutral snapshots from the documented public [DEX Screener API](https://docs.dexscreener.com/api/reference). The proposal view flags only observable conditions such as missing data, low liquidity, large recent price movement, or a young pair. It does not provide recommendations, personalized advice, or position sizes.
 
-The included sources are `https://x.com/jdncrtr` and `https://x.com/PortalViciados`. API availability, rate limits, and pricing are controlled by X.
+## Phantom boundary
 
-## Telegram setup
+The proposal screen opens the normal system browser. The user connects Phantom there and explicitly approves a signature over the displayed human-readable proposal. No transaction is built or sent, and the signature is not an automated trade instruction.
 
-Create a bot with [BotFather](https://t.me/BotFather), enter its token in Setup, and add that bot as an administrator to every monitored channel. Public Telegram sources are managed directly in the desktop source editor.
+## Local configuration
 
-For a private invite channel, the invite link alone is not access. The owner must add the user-controlled bot, then set the channel's numeric ID in `TELEGRAM_PRIVATE_CHAT_ID` (usually starts with `-100`). Bots receive new channel posts after being added; they do not provide arbitrary historical access.
+Ordinary setup is handled in the desktop UI. `.env.example` is available only for optional initial defaults. The following paths are ignored by Git:
 
-## SMS setup
+- `.env`
+- `data/config.json`
+- `data/state.json`
+- `data/telegram.session`
 
-Create a [Twilio](https://www.twilio.com/) account and enter the account SID, auth token, Twilio sending number, and SMS destination in Setup. Phone numbers use E.164 format. Long posts can use multiple paid SMS segments.
-
-## Discord setup
-
-Create a webhook for a Discord channel you control, then enter its URL under **Setup → Discord**. The URL is saved only in ignored local configuration and is write-only in the UI; the dashboard returns only whether it is configured. Each new-post alert includes the complete post text, source, provider timestamp, and original link. Long text is split across messages so content is not silently truncated. Allowed mentions are disabled.
-
-If a Discord webhook was ever pasted into chat or another unintended location, revoke it in Discord first, generate a replacement, and enter the replacement directly in Trade-Pinger. Use the clear checkbox to remove the saved webhook or paste a new URL to replace it.
-
-## Phantom approval
-
-The desktop proposal screen opens a local review page in the normal system browser, where the user's installed Phantom extension connects directly and shows the signature approval. The app asks Phantom to sign only the displayed human-readable proposal text. The signature stays in the browser and no transaction is created or sent.
-
-The proposal screen may show an educational market-risk summary derived from the selected asset's watchlist snapshot. It flags only observable conditions such as liquidity below $100,000, an absolute 24-hour price move of at least 20%, a pair younger than seven days, or missing data. It is informational only and never produces buy/sell recommendations, personalized investment advice, a position size, or a “should trade” decision.
-
-Never enter a recovery phrase or private key into Trade-Pinger, `.env`, or any linked page.
+The standalone Telegram-Peresonal project is not required; Trade-Pinger contains the integrated listener.

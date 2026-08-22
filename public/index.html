@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,135 +21,64 @@
       </nav>
       <div class="sidebar-footer">
         <span id="liveDot" class="status-dot idle"></span>
-        <div><strong id="liveLabel">Waiting for setup</strong><span id="liveMode">Providers not connected</span></div>
+        <div><strong id="liveLabel">Waiting for setup</strong><span id="liveMode">Telegram not connected</span></div>
       </div>
     </aside>
 
     <section class="content">
       <header class="topbar">
         <div class="breadcrumb"><span>Trade-Pinger</span><i class="fa-solid fa-chevron-right"></i><strong id="pageName">Live feed</strong></div>
-        <button id="pollButton" class="icon-button" title="Check X now"><i class="fa-solid fa-rotate"></i></button>
+        <div class="top-actions"><button id="themeButton" class="icon-button" title="Switch theme"><i class="fa-solid fa-sun"></i></button><button id="checkButton" class="icon-button" title="Check Telegram connection"><i class="fa-solid fa-rotate"></i></button></div>
       </header>
 
       <div class="page-content">
         <section id="feedView" class="view active">
-          <div class="page-heading"><div><p class="eyebrow">REAL-TIME MONITOR</p><h1>Incoming posts</h1><p>Posts appear here as soon as the configured official integrations deliver them.</p></div><div id="streamBadge" class="live-badge"><span></span>Local app live</div></div>
+          <div class="page-heading"><div><p class="eyebrow">LIVE TELEGRAM MONITOR</p><h1>Incoming posts</h1><p>New posts appear after your signed-in Telegram account receives them. Historical messages are not alerted.</p></div><div class="live-badge"><span></span>Local app live</div></div>
           <div id="providerCards" class="provider-grid"></div>
           <div class="stats" id="stats"></div>
-          <section class="component-card feed-card">
-            <div class="card-title"><div><span>Activity</span><h2>Recent posts</h2></div><code id="postCount">0 posts</code></div>
-            <div id="posts" class="posts"></div>
-          </section>
+          <section class="component-card feed-card"><div class="card-title"><div><span>Activity</span><h2>Recent posts</h2></div><code id="postCount">0 posts</code></div><div id="posts" class="posts"></div></section>
         </section>
 
         <section id="tradeView" class="view">
           <div class="page-heading"><div><p class="eyebrow">PHANTOM REVIEW</p><h1>Trade proposal</h1><p>Prepare a proposal here, then approve its text directly in Phantom in your normal browser.</p></div></div>
           <div class="two-column">
-            <section class="component-card">
-              <div class="card-title"><div><span>Proposal</span><h2>Review details</h2></div><code>No transaction</code></div>
-              <form id="proposalForm">
-                <label><span>Sell asset</span><input id="sellAsset" value="SOL" required></label>
-                <label><span>Amount</span><input id="amount" type="number" min="0" step="any" placeholder="0.00" required></label>
-                <label><span>Buy asset</span><input id="buyAsset" value="USDC" required></label>
-                <label><span>Maximum slippage (%)</span><input id="slippage" type="number" min="0" step="0.1" value="1" required></label>
-                <button class="button primary" type="submit"><i class="fa-solid fa-shield-halved"></i>Review in Phantom browser</button>
-              </form>
-            </section>
-            <section class="component-card proposal-card">
-              <div class="card-title"><div><span>Preview</span><h2>Unsigned proposal</h2></div><code>Local only</code></div>
-              <pre id="proposalPreview">Enter proposal details to preview them.</pre>
-              <div id="riskSummary" class="risk-summary"><strong>Market-risk context</strong><span>Informational only. Add the proposed asset to the Setup watchlist to view neutral market conditions.</span></div>
-              <div class="safety"><i class="fa-solid fa-lock"></i><div><strong>Your keys stay yours</strong><span>No recovery phrase or private key is requested. No transaction is built, submitted, broadcast, or automatically traded.</span></div></div>
-            </section>
+            <section class="component-card"><div class="card-title"><div><span>Proposal</span><h2>Review details</h2></div><code>No transaction</code></div><form id="proposalForm">
+              <label><span>Sell asset</span><input id="sellAsset" value="SOL" required></label><label><span>Amount</span><input id="amount" type="number" min="0" step="any" placeholder="0.00" required></label>
+              <label><span>Buy asset</span><input id="buyAsset" value="USDC" required></label><label><span>Maximum slippage (%)</span><input id="slippage" type="number" min="0" step="0.1" value="1" required></label>
+              <button class="button primary" type="submit"><i class="fa-solid fa-shield-halved"></i>Review in Phantom browser</button>
+            </form></section>
+            <section class="component-card proposal-card"><div class="card-title"><div><span>Preview</span><h2>Unsigned proposal</h2></div><code>Local only</code></div><pre id="proposalPreview">Enter proposal details to preview them.</pre><div id="riskSummary" class="risk-summary"><strong>Market-risk context</strong><span>Informational only. Add the proposed asset to the Setup watchlist to view neutral market conditions.</span></div><div class="safety"><i class="fa-solid fa-lock"></i><div><strong>Your keys stay yours</strong><span>No recovery phrase or private key is requested. No transaction is built, submitted, broadcast, or automatically traded.</span></div></div></section>
           </div>
         </section>
 
         <section id="sourcesView" class="view">
-          <div class="page-heading"><div><p class="eyebrow">CONFIGURATION</p><h1>Monitored sources</h1><p>Source links and credentials remain in the local, Git-ignored .env file.</p></div></div>
-          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current sources</h2></div><code>Local config</code></div><div id="sources" class="sources"></div></section>
+          <div class="page-heading"><div><p class="eyebrow">LOCAL CONFIGURATION</p><h1>Monitored channels</h1><p>Only channels accessible to the signed-in Telegram account can be monitored.</p></div></div>
+          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current Telegram sources</h2></div><code>Local only</code></div><div id="sources" class="sources"></div></section>
         </section>
 
         <section id="setupView" class="view setup-view">
-          <div class="page-heading"><div><p class="eyebrow">LOCAL SETUP</p><h1>Connect providers</h1><p>Configuration is stored only on this computer in an ignored local file. Secret values are never shown again after saving.</p></div><span id="saveState" class="save-state">Not saved this session</span></div>
-
+          <div class="page-heading"><div><p class="eyebrow">LOCAL SETUP</p><h1>Connect Telegram and alerts</h1><p>API hash, session, webhook, and phone values are write-only and stay in ignored local storage.</p></div><span id="saveState" class="save-state">Not saved this session</span></div>
           <div class="setup-layout">
             <aside class="setup-steps component-card">
               <div class="card-title"><div><span>Guide</span><h2>Setup steps</h2></div><code>1—4</code></div>
-              <ol>
-                <li><span>1</span><div><strong>Add sources</strong><p>Use X handles/profile links and Telegram public channel handles/links.</p></div></li>
-                <li><span>2</span><div><strong>Connect official APIs</strong><p>Paste provider credentials directly here. Do not send them in chat.</p></div></li>
-                <li><span>3</span><div><strong>Save locally</strong><p>Monitoring reloads immediately using the saved source list and delivery mode.</p></div></li>
-                <li><span>4</span><div><strong>Check Dashboard</strong><p>Confirm connection state, last successful check, and last SMS ping.</p></div></li>
-              </ol>
-              <div class="wallet-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Phantom stays separate</strong><p>Wallet approval happens only in your normal browser extension. This setup never asks for a seed phrase, private key, or wallet credentials.</p></div></div>
+              <ol><li><span>1</span><div><strong>Create Telegram API credentials</strong><p>Get an API ID and API hash from my.telegram.org. Enter them only here.</p></div></li><li><span>2</span><div><strong>Add channels</strong><p>Paste @names, t.me links, or Telegram Web dialog links.</p></div></li><li><span>3</span><div><strong>Authorize by QR</strong><p>Save, select Telegram, then scan with Telegram on your phone.</p></div></li><li><span>4</span><div><strong>Enable Discord</strong><p>Save your own webhook. New posts intentionally ping @everyone.</p></div></li></ol>
+              <div class="wallet-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Phantom stays separate</strong><p>Wallet approval happens only in your normal browser extension. Setup never asks for wallet credentials.</p></div></div>
             </aside>
 
             <form id="setupForm" class="setup-form">
               <div class="setup-tabs" role="tablist">
                 <button class="active" type="button" data-setup-panel="setupSources"><i class="fa-solid fa-list"></i>Sources</button>
-                <button type="button" data-setup-panel="setupX"><i class="fa-brands fa-x-twitter"></i>X</button>
                 <button type="button" data-setup-panel="setupTelegram"><i class="fa-brands fa-telegram"></i>Telegram</button>
                 <button type="button" data-setup-panel="setupTwilio"><i class="fa-solid fa-message"></i>SMS</button>
                 <button type="button" data-setup-panel="setupDiscord"><i class="fa-brands fa-discord"></i>Discord</button>
                 <button type="button" data-setup-panel="setupMarket"><i class="fa-solid fa-chart-line"></i>Market</button>
               </div>
-              <section id="setupSources" class="component-card setup-section active">
-                <div class="card-title"><div><span>Sources</span><h2>Monitor list</h2></div><code>Local</code></div>
-                <div class="source-editor">
-                  <label><span>X handle or profile URL</span><div class="input-action"><input id="newXSource" placeholder="@jdncrtr"><button type="button" data-add-source="x"><i class="fa-solid fa-plus"></i>Add</button></div></label>
-                  <div id="xSourceEditor" class="source-chips"></div>
-                  <label><span>Telegram public channel handle or link</span><div class="input-action"><input id="newTelegramSource" placeholder="@cyberleekario"><button type="button" data-add-source="telegram"><i class="fa-solid fa-plus"></i>Add</button></div></label>
-                  <div id="telegramSourceEditor" class="source-chips"></div>
-                </div>
-              </section>
-
-              <section id="setupX" class="component-card setup-section">
-                <div class="card-title"><div><span>X</span><h2>Official API</h2></div><code id="xConfigured">Not configured</code></div>
-                <div class="form-fields">
-                  <label class="wide"><span>Bearer token</span><input id="xBearerToken" type="password" autocomplete="off" placeholder="Paste to save locally"></label>
-                  <label class="check-field wide"><input id="xStreamEnabled" type="checkbox"><span>Use filtered streaming when the X API tier supports it; otherwise leave off for labeled 15-second polling.</span></label>
-                </div>
-              </section>
-
-              <section id="setupTelegram" class="component-card setup-section">
-                <div class="card-title"><div><span>Telegram</span><h2>User-controlled bot</h2></div><code id="telegramConfigured">Not configured</code></div>
-                <div class="form-fields">
-                  <label class="wide"><span>Bot token</span><input id="telegramBotToken" type="password" autocomplete="off" placeholder="Paste to save locally"></label>
-                  <label class="wide"><span>Private channel numeric chat ID (optional)</span><input id="telegramPrivateChatId" placeholder="-1001234567890"></label>
-                </div>
-              </section>
-
-              <section id="setupTwilio" class="component-card setup-section">
-                <div class="card-title"><div><span>Twilio</span><h2>SMS alerts</h2></div><code id="twilioConfigured">Not configured</code></div>
-                <div class="form-fields">
-                  <label><span>Account SID</span><input id="twilioAccountSid" type="password" autocomplete="off" placeholder="Save locally"></label>
-                  <label><span>Auth token</span><input id="twilioAuthToken" type="password" autocomplete="off" placeholder="Save locally"></label>
-                  <label><span>Twilio from number</span><input id="twilioFromNumber" type="password" autocomplete="off" placeholder="+15551234567"></label>
-                  <label><span>SMS destination</span><input id="smsToNumber" type="password" autocomplete="off" placeholder="+15551234567"></label>
-                </div>
-              </section>
-
-              <section id="setupDiscord" class="component-card setup-section">
-                <div class="card-title"><div><span>Discord</span><h2>Webhook alerts</h2></div><code id="discordConfigured">Not configured</code></div>
-                <div class="form-fields">
-                  <label class="wide"><span>Discord webhook URL</span><input id="discordWebhookUrl" type="password" autocomplete="off" placeholder="Paste a regenerated webhook URL locally"></label>
-                  <label class="check-field wide"><input id="clearDiscordWebhook" type="checkbox"><span>Clear the saved Discord webhook when setup is saved.</span></label>
-                </div>
-                <p class="provider-note"><i class="fa-solid fa-triangle-exclamation"></i>If a webhook was pasted into chat, revoke it in Discord and create a replacement. Enter the replacement only here. Alerts go only to this webhook.</p>
-              </section>
-
-              <section id="setupMarket" class="component-card setup-section">
-                <div class="card-title"><div><span>DEX Screener</span><h2>Coin watchlist</h2></div><code>Public data</code></div>
-                <div class="market-editor">
-                  <label><span>Coin symbol or Solana token address</span><div class="input-action"><input id="newCoin" placeholder="BONK or token address"><button type="button" id="addCoin"><i class="fa-solid fa-plus"></i>Add</button></div></label>
-                  <div id="coinEditor" class="source-chips"></div>
-                  <div id="marketSnapshots" class="market-snapshots"></div>
-                </div>
-                <p class="provider-note"><i class="fa-solid fa-circle-info"></i>Neutral public market data only. Availability and rate limits are controlled by DEX Screener; missing values are shown honestly.</p>
-              </section>
-
-              <div id="setupError" class="setup-error" hidden></div>
-              <button class="button primary save-button" type="submit"><i class="fa-solid fa-floppy-disk"></i>Save setup locally</button>
+              <section id="setupSources" class="component-card setup-section active"><div class="card-title"><div><span>Telegram</span><h2>Multi-channel monitor list</h2></div><code>Up to 50</code></div><div class="source-editor single"><label><span>Channel handle or link</span><div class="input-action"><input id="newTelegramSource" placeholder="@cyberleekario or Telegram Web link"><button type="button" id="addTelegramSource"><i class="fa-solid fa-plus"></i>Add</button></div></label><div id="telegramSourceEditor" class="source-chips"></div></div><p class="provider-note"><i class="fa-solid fa-circle-info"></i>Numeric Telegram Web dialog IDs are resolved only from this account’s accessible dialogs. An inaccessible source shows a clear error; Trade-Pinger never scrapes Telegram Web.</p></section>
+              <section id="setupTelegram" class="component-card setup-section"><div class="card-title"><div><span>Telegram</span><h2>Personal account API</h2></div><code id="telegramConfigured">Not configured</code></div><div class="form-fields"><label><span>API ID</span><input id="telegramApiId" inputmode="numeric" autocomplete="off" placeholder="From my.telegram.org"></label><label><span>API hash</span><input id="telegramApiHash" type="password" autocomplete="off" placeholder="Paste to save locally"></label></div><div class="telegram-auth"><div><strong id="telegramAuthLabel">Not authorized</strong><p id="telegramAuthMessage">Save credentials, then start QR authorization.</p></div><div class="auth-actions"><button class="button secondary" id="authorizeTelegram" type="button"><i class="fa-solid fa-qrcode"></i>Authorize with QR</button><button class="button danger" id="signOutTelegram" type="button"><i class="fa-solid fa-right-from-bracket"></i>Sign out locally</button></div><img id="telegramQr" alt="Telegram authorization QR code" hidden style="display:none"><div id="telegramPasswordArea"></div></div></section>
+              <section id="setupTwilio" class="component-card setup-section"><div class="card-title"><div><span>Twilio</span><h2>Optional SMS alerts</h2></div><code id="twilioConfigured">Not configured</code></div><div class="form-fields"><label><span>Account SID</span><input id="twilioAccountSid" type="password" autocomplete="off"></label><label><span>Auth token</span><input id="twilioAuthToken" type="password" autocomplete="off"></label><label><span>Twilio from number</span><input id="twilioFromNumber" type="password" autocomplete="off"></label><label><span>SMS destination</span><input id="smsToNumber" type="password" autocomplete="off"></label></div></section>
+              <section id="setupDiscord" class="component-card setup-section"><div class="card-title"><div><span>Discord</span><h2>Webhook alerts</h2></div><code id="discordConfigured">Not configured</code></div><div class="form-fields"><label class="wide"><span>Discord webhook URL</span><input id="discordWebhookUrl" type="password" autocomplete="off" placeholder="Paste your regenerated webhook locally"></label><label class="check-field wide"><input id="clearDiscordWebhook" type="checkbox"><span>Clear the saved webhook when setup is saved.</span></label></div><p class="provider-note"><i class="fa-solid fa-bell"></i>Every new monitored post intentionally sends <strong>@everyone</strong>, complete text, source, timestamp, link when available, and supported media to this webhook.</p></section>
+              <section id="setupMarket" class="component-card setup-section"><div class="card-title"><div><span>DEX Screener</span><h2>Coin watchlist</h2></div><code>Public data</code></div><div class="market-editor"><label><span>Coin symbol or Solana token address</span><div class="input-action"><input id="newCoin" placeholder="BONK or token address"><button type="button" id="addCoin"><i class="fa-solid fa-plus"></i>Add</button></div></label><div id="coinEditor" class="source-chips"></div><div id="marketSnapshots" class="market-snapshots"></div></div><p class="provider-note"><i class="fa-solid fa-circle-info"></i>Neutral public market data only. Missing or rate-limited values are shown honestly.</p></section>
+              <div id="setupError" class="setup-error" hidden></div><button class="button primary save-button" type="submit"><i class="fa-solid fa-floppy-disk"></i>Save setup locally</button>
             </form>
           </div>
         </section>
