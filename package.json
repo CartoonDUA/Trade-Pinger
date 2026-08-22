@@ -12,6 +12,8 @@
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "qrcode": "^1.5.4",
+    "teleproto": "^1.228.5",
     "twilio": "^5.8.0"
   },
   "devDependencies": {
