@@ -1,53 +1,55 @@
-# Social Trade Alerts
+# Trade-Pinger
 
-A small local dashboard that checks configured X and Telegram sources, sends each newly detected post's full text and link by SMS, and lets you review and cryptographically approve a trade proposal with Phantom.
+A user-owned Windows desktop monitor for configured X and Telegram sources. New posts appear in the live feed and can be sent with their full text and link through Twilio SMS. The desktop app also prepares human-readable trade proposals for explicit approval in Phantom.
 
-The Phantom flow signs human-readable proposal text only. It does not build, submit, or broadcast a transaction. This app never requests, stores, or transmits a recovery phrase or private key.
+Trade-Pinger never requests, stores, or transmits a recovery phrase or private key. It never constructs, submits, broadcasts, or automatically executes a trade transaction.
 
-## Setup
+## Run on Windows
 
 1. Install Node.js 20 or newer.
-2. Copy `.env.example` to `.env` and fill in the services you want to use.
-3. Install and start the app:
+2. Copy `.env.example` to `.env` and fill in the services you use.
+3. Install dependencies and launch the desktop app:
 
    ```powershell
    npm install
    npm start
    ```
 
-4. Open `http://localhost:3000`.
+The Electron desktop window starts its own local service at `http://localhost:3000`. Use `npm run web` only when you specifically want the browser version.
 
-Local runtime state is saved in `data/state.json` and ignored by Git. It contains detected public post data and polling cursors, not credentials.
+Runtime state is saved in the ignored `data/state.json`. Credentials stay in the ignored `.env` file.
 
-## X
+## Live delivery modes
 
-Create a developer project at the [X Developer Portal](https://developer.x.com/) with official API v2 recent-search access. Put its bearer token in `X_BEARER_TOKEN`. Set `X_SOURCES` to comma-separated profile links. The included defaults are `https://x.com/jdncrtr` and `https://x.com/PortalViciados`.
+- **X polling (default):** official API v2 recent search every 15 seconds. The app labels this as polling and does not claim instant delivery.
+- **X filtered stream:** set `X_STREAM_ENABLED=true` only when the configured X API access tier supports filtered streams. Trade-Pinger installs rules tagged `trade-pinger:*` for the configured profiles, connects to the official filtered-stream endpoint, and reconnects after interruptions.
+- **Telegram long polling:** the user-controlled bot keeps an official Bot API `getUpdates` request open for up to 25 seconds at a time. New matching channel posts are added as soon as Telegram returns them.
+- **Desktop updates:** the local service pushes status and new posts to the desktop window with server-sent events, without a UI refresh interval.
 
-API access levels, rate limits, and pricing are controlled by X. The app polls no faster than every 15 seconds and records the most recent 500 post IDs to avoid duplicate alerts.
+The dashboard shows each provider's configured delivery mode, current connection state, exact last successful provider check, and exact last SMS alert time.
 
-## Telegram
+## X setup
 
-Create a bot with [BotFather](https://t.me/BotFather), put its token in `TELEGRAM_BOT_TOKEN`, and add the bot as an administrator to every channel you want it to monitor. Set `TELEGRAM_SOURCES` to the public and private source links.
+Create a developer project at the [X Developer Portal](https://developer.x.com/) with official API v2 access. Set:
 
-For a private invite channel, an invite link is not enough. The channel owner must explicitly add your authenticated, user-controlled bot integration. After it is added, obtain the channel's numeric ID from a channel update and set `TELEGRAM_PRIVATE_CHAT_ID` (usually starts with `-100`). The app only accepts Telegram updates matching a configured public username or that private chat ID.
+- `X_BEARER_TOKEN`
+- `X_SOURCES` as comma-separated profile links
+- `X_STREAM_ENABLED=false` for recent-search polling, or `true` when the API tier supports filtered streams
 
-Telegram bots receive new channel posts after they are added; they do not provide arbitrary historical access.
+The included sources are `https://x.com/jdncrtr` and `https://x.com/PortalViciados`. API availability, rate limits, and pricing are controlled by X.
 
-## SMS
+## Telegram setup
 
-Create a [Twilio](https://www.twilio.com/) account and set:
+Create a bot with [BotFather](https://t.me/BotFather), set `TELEGRAM_BOT_TOKEN`, and add that bot as an administrator to every monitored channel. `TELEGRAM_SOURCES` contains the public and private source links.
 
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM_NUMBER`
-- `SMS_TO_NUMBER`
+For a private invite channel, the invite link alone is not access. The owner must add the user-controlled bot, then set the channel's numeric ID in `TELEGRAM_PRIVATE_CHAT_ID` (usually starts with `-100`). Bots receive new channel posts after being added; they do not provide arbitrary historical access.
 
-Use E.164 phone-number format. Long posts may be delivered as multiple SMS segments and may incur provider charges.
+## SMS setup
 
-## Phantom
+Create a [Twilio](https://www.twilio.com/) account and set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, and `SMS_TO_NUMBER`. Phone numbers use E.164 format. Long posts can use multiple paid SMS segments.
 
-Install [Phantom](https://phantom.com/download) in the browser that opens the dashboard. Click **Connect Phantom** and approve the connection in the extension. The app receives only the public wallet address.
+## Phantom approval
 
-When you submit a proposal, Phantom shows a signature approval. The signed content is a plain-text proposal and the signature remains in the browser. No trade transaction is constructed or sent. To carry out a trade, use a trusted trading application separately and review its transaction in Phantom before signing.
+The desktop proposal screen opens a local review page in the normal system browser, where the user's installed Phantom extension connects directly and shows the signature approval. The app asks Phantom to sign only the displayed human-readable proposal text. The signature stays in the browser and no transaction is created or sent.
 
-Never enter a recovery phrase or private key into this app, its `.env` file, or any site opened from it.
+Never enter a recovery phrase or private key into Trade-Pinger, `.env`, or any linked page.

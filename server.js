@@ -50,12 +50,13 @@ function telegramUsername(source) {
 }
 
 function statusPayload() {
+  const successfulChecks = Object.values(state.providers).map(provider => provider.lastSuccess).filter(Boolean).sort();
   return {
     sources: [
       ...xSources.map(link => ({ network: 'X', link, configured: Boolean(process.env.X_BEARER_TOKEN) })),
       ...telegramSources.map(link => ({ network: 'Telegram', link, configured: Boolean(process.env.TELEGRAM_BOT_TOKEN) }))
     ],
-    posts: state.posts, lastPoll: state.lastPoll, lastAlert: state.lastAlert, errors: state.errors,
+    posts: state.posts, lastPoll: successfulChecks.at(-1) || null, lastAlert: state.lastAlert, errors: state.errors,
     providers: state.providers,
     smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER && process.env.SMS_TO_NUMBER)
   };

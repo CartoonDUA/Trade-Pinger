@@ -14,19 +14,21 @@ function render(status) {
   latestStatus = status;
   const providers = Object.entries(status.providers || {});
   const connected = providers.filter(([, provider]) => provider.connected).length;
-  const configured = status.sources.filter(source => source.configured).length;
   const hasError = status.errors.length > 0;
 
   document.querySelector('#liveDot').className = `status-dot ${hasError ? 'error' : connected ? '' : 'idle'}`;
   document.querySelector('#liveLabel').textContent = connected ? `${connected} provider${connected === 1 ? '' : 's'} live` : 'Waiting for setup';
   document.querySelector('#liveMode').textContent = hasError ? 'Connection needs attention' : connected ? 'Listening for new posts' : 'Credentials not configured';
 
-  document.querySelector('#providerCards').innerHTML = providers.map(([name, provider]) => `
+  document.querySelector('#providerCards').innerHTML = providers.map(([name, provider]) => {
+    const configured = status.sources.some(source => source.network === name && source.configured);
+    return `
     <article class="provider-card">
       <span class="provider-icon"><i class="fa-brands ${name === 'X' ? 'fa-x-twitter' : 'fa-telegram'}"></i></span>
       <div><strong>${name}</strong><small>${escapeHtml(provider.mode)} · Last success: ${dateTime(provider.lastSuccess)}</small></div>
       <span class="provider-state ${provider.connected ? 'connected' : ''}">${provider.connected ? 'Connected' : configured ? 'Connecting' : 'Needs setup'}</span>
-    </article>`).join('');
+    </article>`;
+  }).join('');
 
   document.querySelector('#stats').innerHTML = `
     <div><strong>${dateTime(status.lastPoll)}</strong><span>Last successful provider check</span></div>
