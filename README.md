@@ -22,11 +22,13 @@ Runtime state is saved in the ignored `data/state.json`. Setup values are saved 
 
 1. Open **Setup** in the fixed side rail.
 2. Add or remove supported X handles/profile links and Telegram public channel handles/links.
-3. Paste official provider credentials directly into the local form. Never send them through chat.
+3. Paste official provider credentials or a regenerated Discord webhook directly into the local form. Never send them through chat.
 4. Choose X streaming only if the X API tier supports filtered streams, then select **Save setup locally**.
 5. Return to **Live feed** to see connection state, the exact last successful provider check, and the exact last SMS alert time.
 
 Saving restarts the local monitors immediately. Secret fields become blank again and show only a “saved locally” placeholder. Source and credential changes under `data/` are runtime-only and must not be committed.
+
+The Setup area also includes a local coin watchlist. Add a coin symbol or Solana token address under **Market** to load a neutral snapshot from the documented public [DEX Screener API](https://docs.dexscreener.com/api/reference). Snapshots show price, 24-hour change and volume, liquidity, market cap/FDV, pair age, and update time when the API provides them. The app refreshes once per minute and reports unavailable or rate-limited data instead of inventing values.
 
 ## Live delivery modes
 
@@ -57,8 +59,16 @@ For a private invite channel, the invite link alone is not access. The owner mus
 
 Create a [Twilio](https://www.twilio.com/) account and enter the account SID, auth token, Twilio sending number, and SMS destination in Setup. Phone numbers use E.164 format. Long posts can use multiple paid SMS segments.
 
+## Discord setup
+
+Create a webhook for a Discord channel you control, then enter its URL under **Setup → Discord**. The URL is saved only in ignored local configuration and is write-only in the UI; the dashboard returns only whether it is configured. Each new-post alert includes the complete post text, source, provider timestamp, and original link. Long text is split across messages so content is not silently truncated. Allowed mentions are disabled.
+
+If a Discord webhook was ever pasted into chat or another unintended location, revoke it in Discord first, generate a replacement, and enter the replacement directly in Trade-Pinger. Use the clear checkbox to remove the saved webhook or paste a new URL to replace it.
+
 ## Phantom approval
 
 The desktop proposal screen opens a local review page in the normal system browser, where the user's installed Phantom extension connects directly and shows the signature approval. The app asks Phantom to sign only the displayed human-readable proposal text. The signature stays in the browser and no transaction is created or sent.
+
+The proposal screen may show an educational market-risk summary derived from the selected asset's watchlist snapshot. It flags only observable conditions such as liquidity below $100,000, an absolute 24-hour price move of at least 20%, a pair younger than seven days, or missing data. It is informational only and never produces buy/sell recommendations, personalized investment advice, a position size, or a “should trade” decision.
 
 Never enter a recovery phrase or private key into Trade-Pinger, `.env`, or any linked page.

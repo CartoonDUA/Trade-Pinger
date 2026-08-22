@@ -58,6 +58,7 @@
             <section class="component-card proposal-card">
               <div class="card-title"><div><span>Preview</span><h2>Unsigned proposal</h2></div><code>Local only</code></div>
               <pre id="proposalPreview">Enter proposal details to preview them.</pre>
+              <div id="riskSummary" class="risk-summary"><strong>Market-risk context</strong><span>Informational only. Add the proposed asset to the Setup watchlist to view neutral market conditions.</span></div>
               <div class="safety"><i class="fa-solid fa-lock"></i><div><strong>Your keys stay yours</strong><span>No recovery phrase or private key is requested. No transaction is built, submitted, broadcast, or automatically traded.</span></div></div>
             </section>
           </div>
@@ -89,6 +90,8 @@
                 <button type="button" data-setup-panel="setupX"><i class="fa-brands fa-x-twitter"></i>X</button>
                 <button type="button" data-setup-panel="setupTelegram"><i class="fa-brands fa-telegram"></i>Telegram</button>
                 <button type="button" data-setup-panel="setupTwilio"><i class="fa-solid fa-message"></i>SMS</button>
+                <button type="button" data-setup-panel="setupDiscord"><i class="fa-brands fa-discord"></i>Discord</button>
+                <button type="button" data-setup-panel="setupMarket"><i class="fa-solid fa-chart-line"></i>Market</button>
               </div>
               <section id="setupSources" class="component-card setup-section active">
                 <div class="card-title"><div><span>Sources</span><h2>Monitor list</h2></div><code>Local</code></div>
@@ -124,6 +127,25 @@
                   <label><span>Twilio from number</span><input id="twilioFromNumber" type="password" autocomplete="off" placeholder="+15551234567"></label>
                   <label><span>SMS destination</span><input id="smsToNumber" type="password" autocomplete="off" placeholder="+15551234567"></label>
                 </div>
+              </section>
+
+              <section id="setupDiscord" class="component-card setup-section">
+                <div class="card-title"><div><span>Discord</span><h2>Webhook alerts</h2></div><code id="discordConfigured">Not configured</code></div>
+                <div class="form-fields">
+                  <label class="wide"><span>Discord webhook URL</span><input id="discordWebhookUrl" type="password" autocomplete="off" placeholder="Paste a regenerated webhook URL locally"></label>
+                  <label class="check-field wide"><input id="clearDiscordWebhook" type="checkbox"><span>Clear the saved Discord webhook when setup is saved.</span></label>
+                </div>
+                <p class="provider-note"><i class="fa-solid fa-triangle-exclamation"></i>If a webhook was pasted into chat, revoke it in Discord and create a replacement. Enter the replacement only here. Alerts go only to this webhook.</p>
+              </section>
+
+              <section id="setupMarket" class="component-card setup-section">
+                <div class="card-title"><div><span>DEX Screener</span><h2>Coin watchlist</h2></div><code>Public data</code></div>
+                <div class="market-editor">
+                  <label><span>Coin symbol or Solana token address</span><div class="input-action"><input id="newCoin" placeholder="BONK or token address"><button type="button" id="addCoin"><i class="fa-solid fa-plus"></i>Add</button></div></label>
+                  <div id="coinEditor" class="source-chips"></div>
+                  <div id="marketSnapshots" class="market-snapshots"></div>
+                </div>
+                <p class="provider-note"><i class="fa-solid fa-circle-info"></i>Neutral public market data only. Availability and rate limits are controlled by DEX Screener; missing values are shown honestly.</p>
               </section>
 
               <div id="setupError" class="setup-error" hidden></div>

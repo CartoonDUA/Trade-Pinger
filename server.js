@@ -44,7 +44,9 @@ const defaultConfig = {
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER || '',
-  smsToNumber: process.env.SMS_TO_NUMBER || ''
+  smsToNumber: process.env.SMS_TO_NUMBER || '',
+  discordWebhookUrl: '',
+  coinWatchlist: []
 };
 
 let config = fs.existsSync(configFile) ? { ...defaultConfig, ...JSON.parse(fs.readFileSync(configFile, 'utf8')) } : defaultConfig;
@@ -52,6 +54,7 @@ let state = {
   seen: [], posts: [], lastAlert: null, errors: [], telegramOffset: 0,
   providers: { X: { connected: false, lastSuccess: null }, Telegram: { connected: false, lastSuccess: null } }
 };
+let marketSnapshots = [];
 if (fs.existsSync(stateFile)) state = { ...state, ...JSON.parse(fs.readFileSync(stateFile, 'utf8')) };
 state.providers = {
   X: { connected: false, lastSuccess: state.providers?.X?.lastSuccess || null },
@@ -82,16 +85,19 @@ function publicConfig() {
     xStreamEnabled: config.xStreamEnabled,
     telegramSources: config.telegramSources,
     telegramPrivateChatId: config.telegramPrivateChatId,
+    coinWatchlist: config.coinWatchlist || [],
     configured: {
       x: Boolean(config.xBearerToken),
       telegram: Boolean(config.telegramBotToken),
       twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken && config.twilioFromNumber && config.smsToNumber),
+      discord: Boolean(config.discordWebhookUrl),
       xBearerToken: Boolean(config.xBearerToken),
       telegramBotToken: Boolean(config.telegramBotToken),
       twilioAccountSid: Boolean(config.twilioAccountSid),
       twilioAuthToken: Boolean(config.twilioAuthToken),
       twilioFromNumber: Boolean(config.twilioFromNumber),
-      smsToNumber: Boolean(config.smsToNumber)
+      smsToNumber: Boolean(config.smsToNumber),
+      discordWebhookUrl: Boolean(config.discordWebhookUrl)
     }
   };
 }
@@ -112,7 +118,9 @@ function statusPayload() {
       X: { ...state.providers.X, mode: providerMode('X') },
       Telegram: { ...state.providers.Telegram, mode: providerMode('Telegram') }
     },
-    smsConfigured: publicConfig().configured.twilio
+    smsConfigured: publicConfig().configured.twilio,
+    discordConfigured: publicConfig().configured.discord,
+    marketSnapshots
   };
 }
 
@@ -141,13 +149,89 @@ async function sendSms(post) {
   state.lastAlert = new Date().toISOString();
 }
 
+function discordMessages(post) {
+  const header = `**New ${post.network} post from ${post.source}**\nTimestamp: ${post.createdAt}`;
+  const chunks = post.text.match(/[\s\S]{1,1800}/g) || ['[Media post]'];
+  return chunks.map((chunk, index) => {
+    const prefix = index === 0 ? `${header}\n\n` : '';
+    const link = index === chunks.length - 1 ? `\n\n${post.link}` : '';
+    return `${prefix}${chunk}${link}`;
+  });
+}
+
+function normalizeCoin(value) {
+  const coin = value.trim();
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(coin)) return coin;
+  if (/^[A-Za-z][A-Za-z0-9]{1,14}$/.test(coin)) return coin.toUpperCase();
+  throw new Error(`Unsupported coin symbol or Solana token address: ${value}`);
+}
+
+function marketView(coin, pair) {
+  if (!pair) return { coin, error: 'No Solana DEX pair found', updatedAt: new Date().toISOString() };
+  return {
+    coin,
+    symbol: pair.baseToken?.symbol || coin,
+    name: pair.baseToken?.name || '',
+    priceUsd: pair.priceUsd || null,
+    change24h: pair.priceChange?.h24 ?? null,
+    volume24h: pair.volume?.h24 ?? null,
+    liquidityUsd: pair.liquidity?.usd ?? null,
+    marketCap: pair.marketCap ?? null,
+    fdv: pair.fdv ?? null,
+    pairCreatedAt: pair.pairCreatedAt ?? null,
+    dex: pair.dexId || null,
+    pairUrl: pair.url || null,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function fetchCoinMarket(coin) {
+  const address = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(coin);
+  const url = address
+    ? `https://api.dexscreener.com/token-pairs/v1/solana/${coin}`
+    : `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(coin)}`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`Market API returned ${response.status}`);
+  const result = await response.json();
+  const pairs = (Array.isArray(result) ? result : result.pairs || []).filter(pair => pair.chainId === 'solana');
+  if (!address) pairs.splice(0, pairs.length, ...pairs.filter(pair => pair.baseToken?.symbol?.toUpperCase() === coin));
+  pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+  return marketView(coin, pairs[0]);
+}
+
+async function refreshMarkets() {
+  const watchlist = config.coinWatchlist || [];
+  marketSnapshots = await Promise.all(watchlist.map(async coin => {
+    try { return await fetchCoinMarket(coin); }
+    catch (error) { return { coin, error: error.message, updatedAt: new Date().toISOString() }; }
+  }));
+  publish();
+}
+
+async function sendDiscord(post) {
+  if (!config.discordWebhookUrl) return;
+  for (const content of discordMessages(post)) {
+    const response = await fetch(config.discordWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } })
+    });
+    if (!response.ok) throw new Error(`Discord webhook returned ${response.status}`);
+  }
+  state.lastAlert = new Date().toISOString();
+}
+
 async function addPost(post) {
   if (state.seen.includes(post.id)) return;
   state.seen.push(post.id);
   state.seen = state.seen.slice(-500);
   state.posts.unshift(post);
   state.posts = state.posts.slice(0, 50);
-  await sendSms(post);
+  const alerts = await Promise.allSettled([sendSms(post), sendDiscord(post)]);
+  for (const result of alerts) {
+    if (result.status === 'rejected') state.errors.unshift({ service: 'Alert', message: result.reason.message, time: new Date().toISOString() });
+  }
+  state.errors = state.errors.slice(0, 8);
   saveJson(stateFile, state);
   publish();
 }
@@ -275,15 +359,20 @@ app.post('/api/config', (request, response) => {
       xSources: [...new Set((input.xSources || []).map(normalizeXSource))],
       xStreamEnabled: Boolean(input.xStreamEnabled),
       telegramSources: [...new Set((input.telegramSources || []).map(normalizeTelegramSource))],
-      telegramPrivateChatId: String(input.telegramPrivateChatId || '').trim()
+      telegramPrivateChatId: String(input.telegramPrivateChatId || '').trim(),
+      coinWatchlist: [...new Set((input.coinWatchlist || []).map(normalizeCoin))]
     };
     if (next.telegramPrivateChatId && !/^-100\d+$/.test(next.telegramPrivateChatId)) throw new Error('Private Telegram chat ID must start with -100 and contain only digits.');
-    for (const key of ['xBearerToken', 'telegramBotToken', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber']) {
+    if (next.coinWatchlist.length > 20) throw new Error('Coin watchlist supports up to 20 entries.');
+    for (const key of ['xBearerToken', 'telegramBotToken', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl']) {
       if (typeof input[key] === 'string' && input[key].trim()) next[key] = input[key].trim();
     }
+    if (input.clearDiscordWebhook) next.discordWebhookUrl = '';
+    if (next.discordWebhookUrl && !/^https:\/\/(?:canary\.|ptb\.)?(?:discord(?:app)?\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9._-]+$/.test(next.discordWebhookUrl)) throw new Error('Enter an official Discord webhook URL.');
     config = next;
     saveJson(configFile, config);
     restartMonitors();
+    refreshMarkets();
     response.json({ saved: true, config: publicConfig() });
   } catch (error) {
     response.status(400).json({ saved: false, message: error.message });
@@ -297,7 +386,9 @@ app.post('/api/poll', async (request, response) => {
 const server = app.listen(port, () => {
   console.log(`Trade-Pinger service running at http://localhost:${port}`);
   restartMonitors();
+  refreshMarkets();
   setInterval(() => pollX().catch(error => rememberError('X', error)), pollInterval);
+  setInterval(refreshMarkets, 60000);
 });
 
 module.exports = server;

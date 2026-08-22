@@ -37,6 +37,25 @@ test('source management accepts only supported public source formats', () => {
   assert.match(server, /Unsupported Telegram public source/);
 });
 
+test('Discord webhook stays write-only and sends complete post context', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  assert.match(server, /discordWebhookUrl: Boolean\(config\.discordWebhookUrl\)/);
+  assert.match(server, /clearDiscordWebhook/);
+  assert.match(server, /allowed_mentions: \{ parse: \[\] \}/);
+  assert.match(server, /post\.source/);
+  assert.match(server, /post\.createdAt/);
+  assert.match(server, /post\.link/);
+});
+
+test('market watchlist uses read-only DEX data and neutral risk flags', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  const client = fs.readFileSync('public/app.js', 'utf8');
+  assert.match(server, /api\.dexscreener\.com/);
+  assert.match(server, /coinWatchlist/);
+  assert.match(client, /Informational only—not a recommendation or personalized advice/);
+  assert.doesNotMatch(client, /should (buy|sell|trade)|position size/i);
+});
+
 test('server does not reference recovery phrases or private keys', () => {
   const source = fs.readFileSync('server.js', 'utf8');
   assert.doesNotMatch(source, /private.?key|recovery.?phrase|seed.?phrase/i);
