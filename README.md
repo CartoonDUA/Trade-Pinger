@@ -7,17 +7,26 @@ Trade-Pinger never requests, stores, or transmits a recovery phrase or private k
 ## Run on Windows
 
 1. Install Node.js 20 or newer.
-2. Copy `.env.example` to `.env` and fill in the services you use.
-3. Install dependencies and launch the desktop app:
+2. Install dependencies and launch the desktop app:
 
    ```powershell
    npm install
    npm start
    ```
 
-The Electron desktop window starts its own local service at `http://localhost:3000`. Use `npm run web` only when you specifically want the browser version.
+The Electron desktop window starts its own local service at `http://localhost:3000`. Open **Setup** in the left rail to add sources and configure providers; ordinary setup does not require editing `.env`. Use `npm run web` only when you specifically want the browser version.
 
-Runtime state is saved in the ignored `data/state.json`. Credentials stay in the ignored `.env` file.
+Runtime state is saved in the ignored `data/state.json`. Setup values are saved in the ignored `data/config.json`. Provider tokens and phone values are write-only in the UI: after saving, the app reports only whether each value is configured and never returns its contents to the dashboard. `.env` remains available for initial/default values but is not needed for normal desktop setup.
+
+## Desktop setup
+
+1. Open **Setup** in the fixed side rail.
+2. Add or remove supported X handles/profile links and Telegram public channel handles/links.
+3. Paste official provider credentials directly into the local form. Never send them through chat.
+4. Choose X streaming only if the X API tier supports filtered streams, then select **Save setup locally**.
+5. Return to **Live feed** to see connection state, the exact last successful provider check, and the exact last SMS alert time.
+
+Saving restarts the local monitors immediately. Secret fields become blank again and show only a “saved locally” placeholder. Source and credential changes under `data/` are runtime-only and must not be committed.
 
 ## Live delivery modes
 
@@ -30,7 +39,7 @@ The dashboard shows each provider's configured delivery mode, current connection
 
 ## X setup
 
-Create a developer project at the [X Developer Portal](https://developer.x.com/) with official API v2 access. Set:
+Create a developer project at the [X Developer Portal](https://developer.x.com/) with official API v2 access. Enter the following in the desktop Setup tab:
 
 - `X_BEARER_TOKEN`
 - `X_SOURCES` as comma-separated profile links
@@ -40,13 +49,13 @@ The included sources are `https://x.com/jdncrtr` and `https://x.com/PortalViciad
 
 ## Telegram setup
 
-Create a bot with [BotFather](https://t.me/BotFather), set `TELEGRAM_BOT_TOKEN`, and add that bot as an administrator to every monitored channel. `TELEGRAM_SOURCES` contains the public and private source links.
+Create a bot with [BotFather](https://t.me/BotFather), enter its token in Setup, and add that bot as an administrator to every monitored channel. Public Telegram sources are managed directly in the desktop source editor.
 
 For a private invite channel, the invite link alone is not access. The owner must add the user-controlled bot, then set the channel's numeric ID in `TELEGRAM_PRIVATE_CHAT_ID` (usually starts with `-100`). Bots receive new channel posts after being added; they do not provide arbitrary historical access.
 
 ## SMS setup
 
-Create a [Twilio](https://www.twilio.com/) account and set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, and `SMS_TO_NUMBER`. Phone numbers use E.164 format. Long posts can use multiple paid SMS segments.
+Create a [Twilio](https://www.twilio.com/) account and enter the account SID, auth token, Twilio sending number, and SMS destination in Setup. Phone numbers use E.164 format. Long posts can use multiple paid SMS segments.
 
 ## Phantom approval
 

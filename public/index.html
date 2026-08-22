@@ -17,6 +17,7 @@
         <button class="nav-item active" data-view="feed"><i class="fa-solid fa-satellite-dish"></i>Live feed</button>
         <button class="nav-item" data-view="trade"><i class="fa-solid fa-arrow-right-arrow-left"></i>Trade proposal</button>
         <button class="nav-item" data-view="sources"><i class="fa-solid fa-list"></i>Sources</button>
+        <button class="nav-item" data-view="setup"><i class="fa-solid fa-gear"></i>Setup</button>
       </nav>
       <div class="sidebar-footer">
         <span id="liveDot" class="status-dot idle"></span>
@@ -64,7 +65,71 @@
 
         <section id="sourcesView" class="view">
           <div class="page-heading"><div><p class="eyebrow">CONFIGURATION</p><h1>Monitored sources</h1><p>Source links and credentials remain in the local, Git-ignored .env file.</p></div></div>
-          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current sources</h2></div><code>.env</code></div><div id="sources" class="sources"></div></section>
+          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current sources</h2></div><code>Local config</code></div><div id="sources" class="sources"></div></section>
+        </section>
+
+        <section id="setupView" class="view setup-view">
+          <div class="page-heading"><div><p class="eyebrow">LOCAL SETUP</p><h1>Connect providers</h1><p>Configuration is stored only on this computer in an ignored local file. Secret values are never shown again after saving.</p></div><span id="saveState" class="save-state">Not saved this session</span></div>
+
+          <div class="setup-layout">
+            <aside class="setup-steps component-card">
+              <div class="card-title"><div><span>Guide</span><h2>Setup steps</h2></div><code>1—4</code></div>
+              <ol>
+                <li><span>1</span><div><strong>Add sources</strong><p>Use X handles/profile links and Telegram public channel handles/links.</p></div></li>
+                <li><span>2</span><div><strong>Connect official APIs</strong><p>Paste provider credentials directly here. Do not send them in chat.</p></div></li>
+                <li><span>3</span><div><strong>Save locally</strong><p>Monitoring reloads immediately using the saved source list and delivery mode.</p></div></li>
+                <li><span>4</span><div><strong>Check Dashboard</strong><p>Confirm connection state, last successful check, and last SMS ping.</p></div></li>
+              </ol>
+              <div class="wallet-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Phantom stays separate</strong><p>Wallet approval happens only in your normal browser extension. This setup never asks for a seed phrase, private key, or wallet credentials.</p></div></div>
+            </aside>
+
+            <form id="setupForm" class="setup-form">
+              <div class="setup-tabs" role="tablist">
+                <button class="active" type="button" data-setup-panel="setupSources"><i class="fa-solid fa-list"></i>Sources</button>
+                <button type="button" data-setup-panel="setupX"><i class="fa-brands fa-x-twitter"></i>X</button>
+                <button type="button" data-setup-panel="setupTelegram"><i class="fa-brands fa-telegram"></i>Telegram</button>
+                <button type="button" data-setup-panel="setupTwilio"><i class="fa-solid fa-message"></i>SMS</button>
+              </div>
+              <section id="setupSources" class="component-card setup-section active">
+                <div class="card-title"><div><span>Sources</span><h2>Monitor list</h2></div><code>Local</code></div>
+                <div class="source-editor">
+                  <label><span>X handle or profile URL</span><div class="input-action"><input id="newXSource" placeholder="@jdncrtr"><button type="button" data-add-source="x"><i class="fa-solid fa-plus"></i>Add</button></div></label>
+                  <div id="xSourceEditor" class="source-chips"></div>
+                  <label><span>Telegram public channel handle or link</span><div class="input-action"><input id="newTelegramSource" placeholder="@cyberleekario"><button type="button" data-add-source="telegram"><i class="fa-solid fa-plus"></i>Add</button></div></label>
+                  <div id="telegramSourceEditor" class="source-chips"></div>
+                </div>
+              </section>
+
+              <section id="setupX" class="component-card setup-section">
+                <div class="card-title"><div><span>X</span><h2>Official API</h2></div><code id="xConfigured">Not configured</code></div>
+                <div class="form-fields">
+                  <label class="wide"><span>Bearer token</span><input id="xBearerToken" type="password" autocomplete="off" placeholder="Paste to save locally"></label>
+                  <label class="check-field wide"><input id="xStreamEnabled" type="checkbox"><span>Use filtered streaming when the X API tier supports it; otherwise leave off for labeled 15-second polling.</span></label>
+                </div>
+              </section>
+
+              <section id="setupTelegram" class="component-card setup-section">
+                <div class="card-title"><div><span>Telegram</span><h2>User-controlled bot</h2></div><code id="telegramConfigured">Not configured</code></div>
+                <div class="form-fields">
+                  <label class="wide"><span>Bot token</span><input id="telegramBotToken" type="password" autocomplete="off" placeholder="Paste to save locally"></label>
+                  <label class="wide"><span>Private channel numeric chat ID (optional)</span><input id="telegramPrivateChatId" placeholder="-1001234567890"></label>
+                </div>
+              </section>
+
+              <section id="setupTwilio" class="component-card setup-section">
+                <div class="card-title"><div><span>Twilio</span><h2>SMS alerts</h2></div><code id="twilioConfigured">Not configured</code></div>
+                <div class="form-fields">
+                  <label><span>Account SID</span><input id="twilioAccountSid" type="password" autocomplete="off" placeholder="Save locally"></label>
+                  <label><span>Auth token</span><input id="twilioAuthToken" type="password" autocomplete="off" placeholder="Save locally"></label>
+                  <label><span>Twilio from number</span><input id="twilioFromNumber" type="password" autocomplete="off" placeholder="+15551234567"></label>
+                  <label><span>SMS destination</span><input id="smsToNumber" type="password" autocomplete="off" placeholder="+15551234567"></label>
+                </div>
+              </section>
+
+              <div id="setupError" class="setup-error" hidden></div>
+              <button class="button primary save-button" type="submit"><i class="fa-solid fa-floppy-disk"></i>Save setup locally</button>
+            </form>
+          </div>
         </section>
       </div>
     </section>

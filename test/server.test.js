@@ -21,6 +21,22 @@ test('live provider updates use streaming responses', () => {
   assert.match(server, /timeout=25/);
 });
 
+test('desktop setup persists locally without returning secret contents', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  assert.match(server, /dataDir, 'config\.json'/);
+  assert.match(server, /configured:\s*\{/);
+  assert.match(server, /app\.get\('\/api\/config'.*publicConfig/s);
+  assert.match(server, /app\.post\('\/api\/config'/);
+});
+
+test('source management accepts only supported public source formats', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  assert.match(server, /normalizeXSource/);
+  assert.match(server, /normalizeTelegramSource/);
+  assert.match(server, /Unsupported X source/);
+  assert.match(server, /Unsupported Telegram public source/);
+});
+
 test('server does not reference recovery phrases or private keys', () => {
   const source = fs.readFileSync('server.js', 'utf8');
   assert.doesNotMatch(source, /private.?key|recovery.?phrase|seed.?phrase/i);
