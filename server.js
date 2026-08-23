@@ -7,7 +7,9 @@ const QRCode = require('qrcode');
 const twilio = require('twilio');
 const { TelegramListener, normalizeTelegramSource } = require('./telegram-listener');
 const { XMonitor, normalizeXSource } = require('./x-monitor');
+const { DriveMonitor, normalizeDriveFolder } = require('./drive-monitor');
 const { sendDiscord } = require('./discord-alert');
+const { sendDriveDiscord } = require('./drive-discord');
 const LocalSecrets = require('./local-secrets');
 
 const app = express();
@@ -40,6 +42,14 @@ let config = {
   xBearerToken: localSecrets.xBearerToken || '',
   xSources: (saved.xSources || ['@jdncrtr', '@slace98']).map(normalizeXSource),
   xEnabled: saved.xEnabled === true,
+  driveFolderId: normalizeDriveFolder(saved.driveFolderId || '1BW5jENBH6nQsbcPP7L7x31VtffTc2aJH'),
+  driveEnabled: saved.driveEnabled === true,
+  driveClientId: localSecrets.driveClientId || '',
+  driveClientSecret: localSecrets.driveClientSecret || '',
+  driveAccessToken: localSecrets.driveAccessToken || '',
+  driveRefreshToken: localSecrets.driveRefreshToken || '',
+  driveTokenExpiresAt: Number(localSecrets.driveTokenExpiresAt || 0),
+  driveDiscordWebhookUrl: localSecrets.driveDiscordWebhookUrl || '',
   discordWebhookUrl: localSecrets.discordWebhookUrl || saved.discordWebhookUrl || '',
   twilioAccountSid: localSecrets.twilioAccountSid || saved.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID || '',
   twilioAuthToken: localSecrets.twilioAuthToken || saved.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN || '',
@@ -52,12 +62,13 @@ let config = {
 let state = {
   seen: [], posts: [], lastAlert: null, errors: [], sourceErrors: [], listenerDiagnostics: [],
   telegram: { connected: false, authorized: false, authorizing: false, lastSuccess: null, message: 'Waiting for setup.' },
-  x: { connected: false, checking: false, lastSuccess: null, error: null, message: 'Official X monitoring is stopped.' }
+  x: { connected: false, checking: false, lastSuccess: null, error: null, message: 'Official X monitoring is stopped.' },
+  drive: { connected: false, checking: false, lastSuccess: null, lastAlert: null, error: null, message: 'Google Drive monitoring is stopped.' }
 };
 if (fs.existsSync(stateFile)) {
   const previous = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
   state.seen = previous.seen || [];
-  state.posts = (previous.posts || []).filter(post => ['Telegram', 'X'].includes(post.network));
+  state.posts = (previous.posts || []).filter(post => ['Telegram', 'X', 'Google Drive'].includes(post.network));
   state.lastAlert = previous.lastAlert || null;
 }
 let marketSnapshots = [];
@@ -71,11 +82,14 @@ function saveJson(file, value) {
 
 function saveConfig() {
   saveJson(configFile, {
-    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, xSources: config.xSources, xEnabled: config.xEnabled, coinWatchlist: config.coinWatchlist,
+    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, xSources: config.xSources, xEnabled: config.xEnabled,
+    driveFolderId: config.driveFolderId, driveEnabled: config.driveEnabled, coinWatchlist: config.coinWatchlist,
     desktopNotifications: config.desktopNotifications, notificationSound: config.notificationSound
   });
   secretStore.save({
     telegramApiHash: config.telegramApiHash, xBearerToken: config.xBearerToken, discordWebhookUrl: config.discordWebhookUrl,
+    driveClientId: config.driveClientId, driveClientSecret: config.driveClientSecret, driveAccessToken: config.driveAccessToken,
+    driveRefreshToken: config.driveRefreshToken, driveTokenExpiresAt: String(config.driveTokenExpiresAt || ''), driveDiscordWebhookUrl: config.driveDiscordWebhookUrl,
     twilioAccountSid: config.twilioAccountSid, twilioAuthToken: config.twilioAuthToken,
     twilioFromNumber: config.twilioFromNumber, smsToNumber: config.smsToNumber
   });
@@ -89,6 +103,12 @@ function configured() {
     telegramSession: fs.existsSync(sessionFile),
     x: Boolean(config.xBearerToken),
     xBearerToken: Boolean(config.xBearerToken),
+    driveCredentials: Boolean(config.driveClientId && config.driveClientSecret),
+    driveAuthorized: Boolean(config.driveRefreshToken),
+    driveClientId: Boolean(config.driveClientId),
+    driveClientSecret: Boolean(config.driveClientSecret),
+    driveDiscord: Boolean(config.driveDiscordWebhookUrl),
+    driveDiscordWebhookUrl: Boolean(config.driveDiscordWebhookUrl),
     discord: Boolean(config.discordWebhookUrl),
     discordWebhookUrl: Boolean(config.discordWebhookUrl),
     twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken && config.twilioFromNumber && config.smsToNumber),
@@ -101,7 +121,8 @@ function configured() {
 
 function publicConfig() {
   return {
-    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, xSources: config.xSources, xEnabled: config.xEnabled, coinWatchlist: config.coinWatchlist,
+    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, xSources: config.xSources, xEnabled: config.xEnabled,
+    driveFolderId: config.driveFolderId, driveEnabled: config.driveEnabled, coinWatchlist: config.coinWatchlist,
     desktopNotifications: config.desktopNotifications, notificationSound: config.notificationSound, configured: configured()
   };
 }
@@ -112,13 +133,18 @@ function statusPayload() {
       const error = state.sourceErrors.find(item => item.source === source);
       const diagnostic = state.listenerDiagnostics.find(item => item.source === source);
       return { network: 'Telegram', source, label: source, configured: configured().telegramSession, error: error?.message || null, diagnostic: diagnostic || null };
-    }).concat(config.xSources.map(source => ({ network: 'X', source, label: source, configured: configured().x, error: state.x.error }))),
+    }).concat(config.xSources.map(source => ({ network: 'X', source, label: source, configured: configured().x, error: state.x.error })))
+      .concat([{ network: 'Google Drive', source: config.driveFolderId, label: config.driveFolderId, configured: configured().driveAuthorized, error: state.drive.error }]),
     posts: state.posts,
     lastPoll: state.telegram.lastSuccess,
     lastAlert: state.lastAlert,
     errors: state.errors,
     sourceErrors: state.sourceErrors,
-    providers: { Telegram: { ...state.telegram, mode: 'Personal account live updates' }, X: { ...state.x, enabled: config.xEnabled, configured: configured().x, mode: 'Official API v2 · 5-minute polling' } },
+    providers: {
+      Telegram: { ...state.telegram, mode: 'Personal account live updates' },
+      X: { ...state.x, enabled: config.xEnabled, configured: configured().x, mode: 'Official API v2 · 5-minute polling' },
+      Drive: { ...state.drive, enabled: config.driveEnabled, configured: configured().driveCredentials, authorized: configured().driveAuthorized, webhookConfigured: configured().driveDiscord, mode: 'Official Drive API v3 · 60-second polling' }
+    },
     smsConfigured: configured().twilio,
     discordConfigured: configured().discord,
     marketSnapshots
@@ -151,8 +177,14 @@ async function addPost(post, attachment) {
   state.posts.unshift(post);
   state.posts = state.posts.slice(0, 50);
   global.tradePingerDesktopAlert?.(post, { desktop: config.desktopNotifications, sound: config.notificationSound });
-  const alerts = await Promise.allSettled([sendSms(post), sendDiscord(config.discordWebhookUrl, post, attachment)]);
-  if (alerts.some(result => result.status === 'fulfilled' && result.value)) state.lastAlert = new Date().toISOString();
+  const alertTasks = post.network === 'Google Drive'
+    ? [sendDriveDiscord(config.driveDiscordWebhookUrl, post)]
+    : [sendSms(post), sendDiscord(config.discordWebhookUrl, post, attachment)];
+  const alerts = await Promise.allSettled(alertTasks);
+  if (alerts.some(result => result.status === 'fulfilled' && result.value)) {
+    state.lastAlert = new Date().toISOString();
+    if (post.network === 'Google Drive') state.drive.lastAlert = state.lastAlert;
+  }
   for (const result of alerts) {
     if (result.status === 'rejected') state.errors.unshift({ service: 'Alert', message: result.reason.message, time: new Date().toISOString() });
   }
@@ -179,6 +211,17 @@ const xMonitor = new XMonitor({
   onState: update => { state.x = { ...state.x, ...update }; publish(); }
 });
 
+const driveMonitor = new DriveMonitor({
+  onFile: addPost,
+  onState: update => { state.drive = { ...state.drive, ...update }; publish(); },
+  onCredentials: credentials => {
+    config.driveAccessToken = credentials.accessToken;
+    config.driveRefreshToken = credentials.refreshToken;
+    config.driveTokenExpiresAt = credentials.expiresAt;
+    saveConfig();
+  }
+});
+
 async function restartTelegram() {
   state.errors = [];
   state.sourceErrors = [];
@@ -187,6 +230,14 @@ async function restartTelegram() {
 
 function restartX() {
   xMonitor.start(config.xBearerToken, config.xSources, config.xEnabled);
+}
+
+function restartDrive() {
+  driveMonitor.start({
+    enabled: config.driveEnabled, folderId: config.driveFolderId, clientId: config.driveClientId,
+    clientSecret: config.driveClientSecret, accessToken: config.driveAccessToken,
+    refreshToken: config.driveRefreshToken, expiresAt: config.driveTokenExpiresAt
+  });
 }
 
 function marketView(coin, pair) {
@@ -247,6 +298,8 @@ app.post('/api/config', async (request, response) => {
       telegramSources: [...new Set((input.telegramSources || []).map(normalizeTelegramSource))],
       xSources: [...new Set((input.xSources || []).map(normalizeXSource))],
       xEnabled: input.xEnabled === true,
+      driveFolderId: normalizeDriveFolder(input.driveFolderId || config.driveFolderId),
+      driveEnabled: input.driveEnabled === true,
       coinWatchlist: [...new Set((input.coinWatchlist || []).map(normalizeCoin))],
       desktopNotifications: input.desktopNotifications !== false,
       notificationSound: input.notificationSound !== false
@@ -255,16 +308,22 @@ app.post('/api/config', async (request, response) => {
     if (next.telegramSources.length > 50) throw new Error('Telegram monitoring supports up to 50 sources.');
     if (next.xSources.length > 20) throw new Error('X monitoring supports up to 20 handles.');
     if (next.coinWatchlist.length > 20) throw new Error('Coin watchlist supports up to 20 entries.');
-    for (const key of ['telegramApiHash', 'xBearerToken', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl']) {
+    for (const key of ['telegramApiHash', 'xBearerToken', 'driveClientId', 'driveClientSecret', 'driveDiscordWebhookUrl', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl']) {
       if (typeof input[key] === 'string' && input[key].trim()) next[key] = input[key].trim();
     }
     if (input.clearDiscordWebhook) next.discordWebhookUrl = '';
     if (input.clearXBearerToken) next.xBearerToken = '';
+    if (input.clearDriveCredentials) {
+      next.driveClientId = ''; next.driveClientSecret = ''; next.driveAccessToken = ''; next.driveRefreshToken = ''; next.driveTokenExpiresAt = 0;
+    }
+    if (input.clearDriveDiscordWebhook) next.driveDiscordWebhookUrl = '';
     if (next.discordWebhookUrl && !/^https:\/\/(?:canary\.|ptb\.)?(?:discord(?:app)?\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9._-]+$/.test(next.discordWebhookUrl)) throw new Error('Enter an official Discord webhook URL.');
+    if (next.driveDiscordWebhookUrl && !/^https:\/\/(?:canary\.|ptb\.)?(?:discord(?:app)?\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9._-]+$/.test(next.driveDiscordWebhookUrl)) throw new Error('Enter an official Discord webhook URL for Drive.');
     config = next;
     saveConfig();
     await restartTelegram();
     restartX();
+    restartDrive();
     refreshMarkets();
     response.json({ saved: true, config: publicConfig() });
   } catch (error) {
@@ -294,8 +353,35 @@ app.post('/api/telegram/signout', async (request, response) => {
   response.json({ signedOut: true });
 });
 
+app.post('/api/drive/authorize', (request, response) => {
+  if (!config.driveClientId || !config.driveClientSecret) return response.status(400).json({ message: 'Save the Google desktop OAuth client ID and client secret first.' });
+  driveMonitor.clientId = config.driveClientId;
+  driveMonitor.clientSecret = config.driveClientSecret;
+  const redirectUri = `http://127.0.0.1:${port}/api/drive/callback`;
+  response.json({ url: driveMonitor.authorizationUrl(config.driveClientId, redirectUri) });
+});
+
+app.get('/api/drive/callback', async (request, response) => {
+  try {
+    await driveMonitor.completeAuthorization(String(request.query.code || ''), String(request.query.state || ''));
+    restartDrive();
+    response.type('html').send('<!doctype html><title>Trade-Pinger</title><p>Google Drive authorization complete. You can close this tab and return to Trade-Pinger.</p>');
+  } catch (error) {
+    state.drive = { ...state.drive, connected: false, error: error.message, message: 'Google authorization failed.' };
+    publish();
+    response.status(400).type('html').send('<!doctype html><title>Trade-Pinger</title><p>Google Drive authorization failed. Return to Trade-Pinger and try again.</p>');
+  }
+});
+
+app.post('/api/drive/disconnect', (request, response) => {
+  config.driveAccessToken = ''; config.driveRefreshToken = ''; config.driveTokenExpiresAt = 0; config.driveEnabled = false;
+  saveConfig();
+  restartDrive();
+  response.json({ disconnected: true, config: publicConfig() });
+});
+
 app.post('/api/check', async (request, response) => {
-  try { response.json({ ok: await listener.check(), x: await xMonitor.poll() }); }
+  try { response.json({ ok: await listener.check(), x: await xMonitor.poll(), drive: await driveMonitor.poll() }); }
   catch (error) { rememberError('Telegram', error); response.json({ ok: false }); }
 });
 
@@ -304,10 +390,11 @@ const server = app.listen(port, () => {
   saveConfig();
   restartTelegram();
   restartX();
+  restartDrive();
   refreshMarkets();
   setInterval(() => listener.check().catch(error => rememberError('Telegram', error)), 30000);
   setInterval(refreshMarkets, 60000);
 });
 
-server.on('close', () => { listener.disconnect(); xMonitor.stop(); });
+server.on('close', () => { listener.disconnect(); xMonitor.stop(); driveMonitor.stop(); });
 module.exports = server;

@@ -38,6 +38,14 @@ Monitoring is deliberately off until a bearer token is saved and **Start officia
 
 The official X API currently has no free access for this use and uses [user-funded pay-per-use credits](https://docs.x.com/x-api/fundamentals/post-cap). Availability and per-endpoint cost are shown in the user's X Developer Console. Trade-Pinger never buys credits, enters payment information, enables auto-recharge, or changes billing/spend limits. If credentials or credits are unavailable, leave X monitoring stopped; Telegram and the other local features continue normally.
 
+## Google Drive folder setup
+
+Trade-Pinger uses only the official Google Drive API v3 and never scrapes Drive, downloads file contents, or bypasses folder access. Create a Google Cloud **Desktop app** OAuth client with the Drive API enabled. In **Setup → Drive**, enter the desktop OAuth client ID and client secret, the folder URL or ID, and a newly generated Drive-specific Discord webhook. Save locally, select **Authorize in browser**, and complete Google's official consent in your normal browser. The callback returns to `http://127.0.0.1:3000/api/drive/callback`; Trade-Pinger never asks for Google passwords, cookies, authorization codes, or tokens.
+
+The supplied folder `1BW5jENBH6nQsbcPP7L7x31VtffTc2aJH` is prefilled locally. The signed-in Google account must already have access. After authorization, select **Start 60-second Google Drive polling** and save. The first listing after every start/restart establishes a metadata-only baseline with no historical alerts. Later item IDs—files and folders of every MIME type—appear in Live Feed, use enabled Windows notification/sound settings, and send name, MIME type, timestamps, folder ID, and view link to the separate Drive Discord webhook. File contents are never downloaded.
+
+The Drive webhook is isolated from the general Telegram/X webhook: if it is absent, Drive metadata is not sent elsewhere. Because a webhook was pasted into chat, revoke it in Discord, regenerate it, and enter the replacement only in Trade-Pinger. Values remain write-only and protected locally. **Disconnect locally** stops Drive and removes stored OAuth access/refresh tokens; revoke Trade-Pinger's account access separately from the Google Account security page if desired.
+
 ## Windows new-post alerts
 
 **Setup → Alerts** controls native desktop notifications and the local notification sound. Both default on. Each genuinely new post can show the source and a whitespace-normalized preview limited to 140 characters; clicking the notification focuses Trade-Pinger when Windows supports the action. The existing listener-start cutoff and seen-message ID guard prevent startup history and duplicate events from producing repeated desktop alerts.

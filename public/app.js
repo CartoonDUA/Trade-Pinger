@@ -1,5 +1,5 @@
 let latestStatus;
-let setupConfig = { telegramSources: [], xSources: [], coinWatchlist: [], configured: {} };
+let setupConfig = { telegramSources: [], xSources: [], driveFolderId: '', coinWatchlist: [], configured: {} };
 
 function dateTime(value) {
   return value ? new Date(value).toLocaleString() : 'Never';
@@ -13,6 +13,7 @@ function escapeHtml(value) {
 
 function sourceLink(source) {
   if (source.network === 'X') return `https://x.com/${source.source.slice(1)}`;
+  if (source.network === 'Google Drive') return `https://drive.google.com/drive/folders/${source.source}`;
   return source.source.startsWith('@') ? `https://t.me/${source.source.slice(1)}` : '';
 }
 
@@ -20,21 +21,24 @@ function render(status) {
   latestStatus = status;
   const provider = status.providers.Telegram;
   const xProvider = status.providers.X;
-  const hasError = status.errors.length > 0 || status.sourceErrors.length > 0 || Boolean(xProvider.error);
-  const anyLive = provider.connected || xProvider.connected;
+  const driveProvider = status.providers.Drive;
+  const hasError = status.errors.length > 0 || status.sourceErrors.length > 0 || Boolean(xProvider.error) || Boolean(driveProvider.error);
+  const anyLive = provider.connected || xProvider.connected || driveProvider.connected;
   document.querySelector('#liveDot').className = `status-dot ${hasError ? 'error' : anyLive ? '' : 'idle'}`;
   document.querySelector('#liveLabel').textContent = anyLive ? 'Monitoring live' : provider.authorizing ? 'Authorization pending' : 'Waiting for setup';
-  document.querySelector('#liveMode').textContent = hasError ? 'Connection needs attention' : `Telegram: ${provider.message} X: ${xProvider.message}`;
-  document.querySelector('#providerCards').innerHTML = `<article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-telegram"></i></span><div><strong>Telegram personal account</strong><small>${escapeHtml(provider.mode)} · Last check: ${dateTime(provider.lastSuccess)}</small></div><span class="provider-state ${provider.connected ? 'connected' : ''}">${provider.connected ? 'Listening' : provider.authorized ? 'Reconnect needed' : 'Needs authorization'}</span></article><article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-x-twitter"></i></span><div><strong>Official X API</strong><small>${escapeHtml(xProvider.mode)} · Last check: ${dateTime(xProvider.lastSuccess)}</small></div><span class="provider-state ${xProvider.connected ? 'connected' : ''}">${xProvider.connected ? 'Polling' : xProvider.enabled ? 'Needs attention' : 'Stopped'}</span></article>`;
+  document.querySelector('#liveMode').textContent = hasError ? 'Connection needs attention' : `Telegram: ${provider.message} X: ${xProvider.message} Drive: ${driveProvider.message}`;
+  document.querySelector('#providerCards').innerHTML = `<article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-telegram"></i></span><div><strong>Telegram personal account</strong><small>${escapeHtml(provider.mode)} · Last check: ${dateTime(provider.lastSuccess)}</small></div><span class="provider-state ${provider.connected ? 'connected' : ''}">${provider.connected ? 'Listening' : provider.authorized ? 'Reconnect needed' : 'Needs authorization'}</span></article><article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-x-twitter"></i></span><div><strong>Official X API</strong><small>${escapeHtml(xProvider.mode)} · Last check: ${dateTime(xProvider.lastSuccess)}</small></div><span class="provider-state ${xProvider.connected ? 'connected' : ''}">${xProvider.connected ? 'Polling' : xProvider.enabled ? 'Needs attention' : 'Stopped'}</span></article><article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-google-drive"></i></span><div><strong>Google Drive folder</strong><small>${escapeHtml(driveProvider.mode)} · Last check: ${dateTime(driveProvider.lastSuccess)} · Last alert: ${dateTime(driveProvider.lastAlert)}</small></div><span class="provider-state ${driveProvider.connected ? 'connected' : ''}">${driveProvider.connected ? 'Polling' : driveProvider.enabled ? 'Needs attention' : 'Stopped'}</span></article>`;
+  document.querySelector('#driveConfigured').textContent = driveProvider.authorized ? (driveProvider.enabled ? 'Active' : 'Authorized') : driveProvider.configured ? 'Credentials saved' : 'Not configured';
   document.querySelector('#stats').innerHTML = `<div><strong>${dateTime(status.lastPoll)}</strong><span>Last successful Telegram check</span></div><div><strong>${dateTime(status.lastAlert)}</strong><span>Last alert / ping</span></div><div><strong>${status.discordConfigured ? 'Discord ready' : status.smsConfigured ? 'SMS ready' : 'Needs setup'}</strong><span>Alert delivery</span></div>`;
   document.querySelector('#postCount').textContent = `${status.posts.length} post${status.posts.length === 1 ? '' : 's'}`;
-  document.querySelector('#posts').innerHTML = status.posts.length ? status.posts.map(post => `<article class="post"><span class="post-icon"><i class="fa-brands ${post.network === 'X' ? 'fa-x-twitter' : 'fa-telegram'}"></i></span><div><div class="post-meta"><strong>${escapeHtml(post.source)}</strong><span>${dateTime(post.createdAt)}</span></div><p>${escapeHtml(post.text)}</p>${post.media ? `<small>${post.media.attached ? 'Media forwarded to Discord' : post.media.tooLarge ? 'Media exceeded local forwarding limit' : 'Media was unavailable'}</small>` : ''}</div>${post.link ? `<a href="${escapeHtml(post.link)}" target="_blank" rel="noreferrer" title="Open post"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ''}</article>`).join('') : '<div class="empty"><i class="fa-solid fa-satellite-dish"></i><p>No new posts since monitoring started.</p></div>';
+  document.querySelector('#posts').innerHTML = status.posts.length ? status.posts.map(post => `<article class="post"><span class="post-icon"><i class="fa-brands ${post.network === 'X' ? 'fa-x-twitter' : post.network === 'Google Drive' ? 'fa-google-drive' : 'fa-telegram'}"></i></span><div><div class="post-meta"><strong>${escapeHtml(post.source)}</strong><span>${dateTime(post.createdAt)}</span></div><p>${escapeHtml(post.text)}</p>${post.media ? `<small>${post.media.attached ? 'Media forwarded to Discord' : post.media.tooLarge ? 'Media exceeded local forwarding limit' : 'Media was unavailable'}</small>` : ''}</div>${post.link ? `<a href="${escapeHtml(post.link)}" target="_blank" rel="noreferrer" title="Open post"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ''}</article>`).join('') : '<div class="empty"><i class="fa-solid fa-satellite-dish"></i><p>No new posts since monitoring started.</p></div>';
   document.querySelector('#sources').innerHTML = status.sources.length ? status.sources.map(source => {
     const link = sourceLink(source);
     const name = escapeHtml(source.source);
     const diagnostic = source.diagnostic;
-    const sourceStatus = source.error || (source.network === 'X' ? (source.configured ? 'Official API source' : 'Bearer token needed') : diagnostic ? `Handler registered · received ${diagnostic.received} · accepted ${diagnostic.accepted}` : source.configured ? 'Resolving source' : 'Needs authorization');
-    return `<div class="source"><span class="source-icon"><i class="fa-brands ${source.network === 'X' ? 'fa-x-twitter' : 'fa-telegram'}"></i></span>${link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : `<span>${name}</span>`}<small class="${source.error ? 'source-error' : diagnostic?.registered || source.network === 'X' && source.configured ? 'ready' : ''}">${escapeHtml(sourceStatus)}</small></div>`;
+    const sourceStatus = source.error || (source.network === 'Google Drive' ? (source.configured ? 'Official Drive API folder' : 'Google authorization needed') : source.network === 'X' ? (source.configured ? 'Official API source' : 'Bearer token needed') : diagnostic ? `Handler registered · received ${diagnostic.received} · accepted ${diagnostic.accepted}` : source.configured ? 'Resolving source' : 'Needs authorization');
+    const icon = source.network === 'X' ? 'fa-x-twitter' : source.network === 'Google Drive' ? 'fa-google-drive' : 'fa-telegram';
+    return `<div class="source"><span class="source-icon"><i class="fa-brands ${icon}"></i></span>${link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : `<span>${name}</span>`}<small class="${source.error ? 'source-error' : diagnostic?.registered || source.network !== 'Telegram' && source.configured ? 'ready' : ''}">${escapeHtml(sourceStatus)}</small></div>`;
   }).join('') : '<div class="empty">No monitored sources configured.</div>';
   renderMarkets(status.marketSnapshots || []);
   renderRisk(status.marketSnapshots || []);
@@ -53,11 +57,14 @@ function renderSetup() {
   document.querySelector('#telegramConfigured').textContent = setupConfig.configured.telegramSession ? 'Authorized' : setupConfig.configured.telegram ? 'Credentials saved' : 'Not configured';
   document.querySelector('#xConfigured').textContent = setupConfig.configured.x ? (setupConfig.xEnabled ? 'Active' : 'Token saved') : 'Not configured';
   document.querySelector('#xEnabled').checked = setupConfig.xEnabled === true;
+  document.querySelector('#driveConfigured').textContent = setupConfig.configured.driveAuthorized ? (setupConfig.driveEnabled ? 'Active' : 'Authorized') : setupConfig.configured.driveCredentials ? 'Credentials saved' : 'Not configured';
+  document.querySelector('#driveFolderId').value = setupConfig.driveFolderId || '';
+  document.querySelector('#driveEnabled').checked = setupConfig.driveEnabled === true;
   document.querySelector('#twilioConfigured').textContent = setupConfig.configured.twilio ? 'Configured' : 'Not configured';
   document.querySelector('#discordConfigured').textContent = setupConfig.configured.discord ? 'Configured' : 'Not configured';
   document.querySelector('#desktopNotifications').checked = setupConfig.desktopNotifications !== false;
   document.querySelector('#notificationSound').checked = setupConfig.notificationSound !== false;
-  const secretFields = ['telegramApiHash', 'xBearerToken', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl'];
+  const secretFields = ['telegramApiHash', 'xBearerToken', 'driveClientId', 'driveClientSecret', 'driveDiscordWebhookUrl', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl'];
   secretFields.forEach(id => {
     const input = document.querySelector(`#${id}`);
     input.value = '';
@@ -167,6 +174,13 @@ document.querySelector('#setupForm').addEventListener('submit', async event => {
     xBearerToken: document.querySelector('#xBearerToken').value,
     xEnabled: document.querySelector('#xEnabled').checked,
     clearXBearerToken: document.querySelector('#clearXBearerToken').checked,
+    driveFolderId: document.querySelector('#driveFolderId').value,
+    driveClientId: document.querySelector('#driveClientId').value,
+    driveClientSecret: document.querySelector('#driveClientSecret').value,
+    driveDiscordWebhookUrl: document.querySelector('#driveDiscordWebhookUrl').value,
+    driveEnabled: document.querySelector('#driveEnabled').checked,
+    clearDriveCredentials: document.querySelector('#clearDriveCredentials').checked,
+    clearDriveDiscordWebhook: document.querySelector('#clearDriveDiscordWebhook').checked,
     coinWatchlist: setupConfig.coinWatchlist,
     desktopNotifications: document.querySelector('#desktopNotifications').checked,
     notificationSound: document.querySelector('#notificationSound').checked,
@@ -187,6 +201,8 @@ document.querySelector('#setupForm').addEventListener('submit', async event => {
   setupConfig = result.config;
   document.querySelector('#clearDiscordWebhook').checked = false;
   document.querySelector('#clearXBearerToken').checked = false;
+  document.querySelector('#clearDriveCredentials').checked = false;
+  document.querySelector('#clearDriveDiscordWebhook').checked = false;
   renderSetup();
   document.querySelector('#saveState').textContent = `Saved locally at ${new Date().toLocaleTimeString()}`;
 });
@@ -223,6 +239,22 @@ async function submitTelegramPassword() {
 document.querySelector('#signOutTelegram').addEventListener('click', async () => {
   await fetch('/api/telegram/signout', { method: 'POST' });
   await loadConfig();
+});
+document.querySelector('#authorizeDrive').addEventListener('click', async () => {
+  const response = await fetch('/api/drive/authorize', { method: 'POST' });
+  const result = await response.json();
+  if (!response.ok) {
+    document.querySelector('#setupError').textContent = result.message;
+    document.querySelector('#setupError').hidden = false;
+    return;
+  }
+  if (window.desktop) await window.desktop.openExternal(result.url);
+  else window.open(result.url, '_blank', 'noopener');
+});
+document.querySelector('#disconnectDrive').addEventListener('click', async () => {
+  const result = await fetch('/api/drive/disconnect', { method: 'POST' }).then(response => response.json());
+  setupConfig = result.config;
+  renderSetup();
 });
 document.querySelector('#checkButton').addEventListener('click', async event => {
   event.currentTarget.disabled = true;

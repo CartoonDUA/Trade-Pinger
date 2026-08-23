@@ -4,6 +4,8 @@ const fs = require('fs');
 const { discordPayloads, safePostLink, sendDiscord } = require('../discord-alert');
 const { TelegramListener, normalizeTelegramSource, messageTime } = require('../telegram-listener');
 const { XMonitor, normalizeXSource } = require('../x-monitor');
+const { DriveMonitor, normalizeDriveFolder } = require('../drive-monitor');
+const { driveDiscordPayload, sendDriveDiscord } = require('../drive-discord');
 
 test('X source normalization accepts handles and official profile URLs', () => {
   assert.equal(normalizeXSource('@jdncrtr'), '@jdncrtr');
@@ -61,6 +63,55 @@ test('X uses the generic alert pipeline and write-only desktop setup', () => {
   assert.match(setup, /id="xBearerToken" type="password"/);
   assert.match(setup, /fa-x-twitter/);
   assert.doesNotMatch(`${server}\n${client}\n${setup}`, /nitter|syndication|X_BEARER_TOKEN|X_STREAM_ENABLED/i);
+});
+
+test('Google Drive folder normalization accepts the supplied URL and ID', () => {
+  const id = '1BW5jENBH6nQsbcPP7L7x31VtffTc2aJH';
+  assert.equal(normalizeDriveFolder(id), id);
+  assert.equal(normalizeDriveFolder(`https://drive.google.com/drive/folders/${id}`), id);
+  assert.throws(() => normalizeDriveFolder('https://example.com/folder'));
+});
+
+test('Google Drive monitor baselines history and routes each new file once', async () => {
+  const oldFile = { id: 'old', name: 'Existing.pdf', mimeType: 'application/pdf', createdTime: '2026-08-23T10:00:00.000Z', modifiedTime: '2026-08-23T10:00:00.000Z', webViewLink: 'https://drive.google.com/file/d/old/view' };
+  const newFile = { id: 'new', name: 'New folder', mimeType: 'application/vnd.google-apps.folder', createdTime: '2026-08-23T10:01:00.000Z', modifiedTime: '2026-08-23T10:01:00.000Z', webViewLink: 'https://drive.google.com/drive/folders/new' };
+  const replies = [[oldFile], [newFile, oldFile], [newFile, oldFile]];
+  const posts = [];
+  const monitor = new DriveMonitor({
+    onFile: post => posts.push(post), onState() {}, onCredentials() {},
+    fetcher: async (url, options) => {
+      assert.match(url, /^https:\/\/www\.googleapis\.com\/drive\/v3\/files\?/);
+      assert.equal(options.headers.Authorization, 'Bearer mock-access');
+      return { ok: true, json: async () => ({ files: replies.shift() }) };
+    }
+  });
+  Object.assign(monitor, { running: true, folderId: 'folder-id-123', accessToken: 'mock-access', expiresAt: Date.now() + 3600000 });
+  await monitor.poll();
+  assert.equal(posts.length, 0);
+  await monitor.poll();
+  await monitor.poll();
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].id, 'Drive:new');
+  assert.equal(posts[0].network, 'Google Drive');
+  assert.match(posts[0].text, /New folder/);
+  monitor.stop();
+});
+
+test('Google Drive Discord payload is rich, scoped, and mocked', async () => {
+  const post = { createdAt: '2026-08-23T10:01:00.000Z', link: 'https://drive.google.com/file/d/new/view', drive: { name: 'Report.pdf', mimeType: 'application/pdf', folderId: 'folder-id-123', modifiedTime: '2026-08-23T10:02:00.000Z' } };
+  const payload = driveDiscordPayload(post);
+  assert.equal(payload.content, '@everyone');
+  assert.deepEqual(payload.allowed_mentions, { parse: ['everyone'] });
+  assert.equal(payload.embeds[0].title, 'New Google Drive file');
+  assert.equal(payload.embeds[0].url, post.link);
+  assert.deepEqual(payload.embeds[0].fields.map(field => field.name), ['Name', 'Type', 'Folder ID', 'Created', 'Modified']);
+  let sent;
+  await sendDriveDiscord('https://local.invalid/drive-webhook', post, async (url, options) => {
+    sent = { url, body: JSON.parse(options.body) };
+    return { ok: true, status: 204 };
+  });
+  assert.equal(sent.url, 'https://local.invalid/drive-webhook');
+  assert.equal(sent.body.embeds[0].fields[0].value, 'Report.pdf');
 });
 
 test('Telegram source normalization accepts every supported form', () => {
@@ -183,8 +234,11 @@ test('local secrets, X token, and Telegram session are never returned by public 
   const server = fs.readFileSync('server.js', 'utf8');
   const secrets = fs.readFileSync('local-secrets.js', 'utf8');
   const publicConfig = server.match(/function publicConfig\(\) \{([\s\S]*?)\n\}/)[1];
-  assert.doesNotMatch(publicConfig, /telegramApiHash:\s*config|xBearerToken:\s*config|discordWebhookUrl:\s*config|telegram\.session/);
+  assert.doesNotMatch(publicConfig, /telegramApiHash:\s*config|xBearerToken:\s*config|driveClientId:\s*config|driveClientSecret:\s*config|driveAccessToken:\s*config|driveRefreshToken:\s*config|driveDiscordWebhookUrl:\s*config|discordWebhookUrl:\s*config|telegram\.session/);
   assert.match(server, /xBearerToken: config\.xBearerToken/);
+  assert.match(server, /driveRefreshToken: config\.driveRefreshToken/);
+  assert.match(server, /post\.network === 'Google Drive'[\s\S]*sendDriveDiscord\(config\.driveDiscordWebhookUrl/);
+  assert.match(server, /post\.network === 'Google Drive'\s*\? \[sendDriveDiscord\(config\.driveDiscordWebhookUrl, post\)\]\s*:\s*\[sendSms\(post\), sendDiscord\(config\.discordWebhookUrl/);
   assert.match(server, /dataDir, 'telegram\.session'/);
   assert.match(server, /desktopNotifications: config\.desktopNotifications, notificationSound: config\.notificationSound/);
   assert.match(secrets, /safeStorage\.encryptString/);
