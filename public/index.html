@@ -21,7 +21,7 @@
       </nav>
       <div class="sidebar-footer">
         <span id="liveDot" class="status-dot idle"></span>
-        <div><strong id="liveLabel">Waiting for setup</strong><span id="liveMode">Telegram not connected</span></div>
+        <div><strong id="liveLabel">Waiting for setup</strong><span id="liveMode">Providers not connected</span></div>
       </div>
     </aside>
 
@@ -33,7 +33,7 @@
 
       <div class="page-content">
         <section id="feedView" class="view active">
-          <div class="page-heading"><div><p class="eyebrow">LIVE TELEGRAM MONITOR</p><h1>Incoming posts</h1><p>New posts appear after your signed-in Telegram account receives them. Historical messages are not alerted.</p></div><div class="live-badge"><span></span>Local app live</div></div>
+          <div class="page-heading"><div><p class="eyebrow">LIVE SOURCE MONITOR</p><h1>Incoming posts</h1><p>New Telegram and official X posts appear only after their listeners establish a startup baseline. Historical messages are not alerted.</p></div><div class="live-badge"><span></span>Local app live</div></div>
           <div id="providerCards" class="provider-grid"></div>
           <div class="stats" id="stats"></div>
           <section class="component-card feed-card"><div class="card-title"><div><span>Activity</span><h2>Recent posts</h2></div><code id="postCount">0 posts</code></div><div id="posts" class="posts"></div></section>
@@ -52,12 +52,12 @@
         </section>
 
         <section id="sourcesView" class="view">
-          <div class="page-heading"><div><p class="eyebrow">LOCAL CONFIGURATION</p><h1>Monitored channels</h1><p>Only channels accessible to the signed-in Telegram account can be monitored.</p></div></div>
-          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current Telegram sources</h2></div><code>Local only</code></div><div id="sources" class="sources"></div></section>
+          <div class="page-heading"><div><p class="eyebrow">LOCAL CONFIGURATION</p><h1>Monitored sources</h1><p>Telegram uses the signed-in account; X uses only the documented official API v2.</p></div></div>
+          <section class="component-card"><div class="card-title"><div><span>Watch list</span><h2>Current Telegram and X sources</h2></div><code>Local only</code></div><div id="sources" class="sources"></div></section>
         </section>
 
         <section id="setupView" class="view setup-view">
-          <div class="page-heading"><div><p class="eyebrow">LOCAL SETUP</p><h1>Connect Telegram and alerts</h1><p>API hash, session, webhook, and phone values are write-only and stay in ignored local storage.</p></div><span id="saveState" class="save-state">Not saved this session</span></div>
+          <div class="page-heading"><div><p class="eyebrow">LOCAL SETUP</p><h1>Connect sources and alerts</h1><p>API tokens, session, webhook, and phone values are write-only and stay in ignored protected local storage.</p></div><span id="saveState" class="save-state">Not saved this session</span></div>
           <div class="setup-layout">
             <aside class="setup-steps component-card">
               <div class="card-title"><div><span>Guide</span><h2>Setup steps</h2></div><code>1—4</code></div>
@@ -69,6 +69,7 @@
               <div class="setup-tabs" role="tablist">
                 <button class="active" type="button" data-setup-panel="setupSources"><i class="fa-solid fa-list"></i>Sources</button>
                 <button type="button" data-setup-panel="setupTelegram"><i class="fa-brands fa-telegram"></i>Telegram</button>
+                <button type="button" data-setup-panel="setupX"><i class="fa-brands fa-x-twitter"></i>X</button>
                 <button type="button" data-setup-panel="setupTwilio"><i class="fa-solid fa-message"></i>SMS</button>
                 <button type="button" data-setup-panel="setupDiscord"><i class="fa-brands fa-discord"></i>Discord</button>
                 <button type="button" data-setup-panel="setupAlerts"><i class="fa-solid fa-bell"></i>Alerts</button>
@@ -76,6 +77,7 @@
               </div>
               <section id="setupSources" class="component-card setup-section active"><div class="card-title"><div><span>Telegram</span><h2>Multi-channel monitor list</h2></div><code>Up to 50</code></div><div class="source-editor single"><label><span>Channel handle or link</span><div class="input-action"><input id="newTelegramSource" placeholder="@cyberleekario or Telegram Web link"><button type="button" id="addTelegramSource"><i class="fa-solid fa-plus"></i>Add</button></div></label><div id="telegramSourceEditor" class="source-chips"></div></div><p class="provider-note"><i class="fa-solid fa-circle-info"></i>Numeric Telegram Web dialog IDs are resolved only from this account’s accessible dialogs. An inaccessible source shows a clear error; Trade-Pinger never scrapes Telegram Web.</p></section>
               <section id="setupTelegram" class="component-card setup-section"><div class="card-title"><div><span>Telegram</span><h2>Personal account API</h2></div><code id="telegramConfigured">Not configured</code></div><div class="form-fields"><label><span>API ID</span><input id="telegramApiId" inputmode="numeric" autocomplete="off" placeholder="From my.telegram.org"></label><label><span>API hash</span><input id="telegramApiHash" type="password" autocomplete="off" placeholder="Paste to save locally"></label></div><div class="telegram-auth"><div><strong id="telegramAuthLabel">Not authorized</strong><p id="telegramAuthMessage">Save credentials, then start QR authorization.</p></div><div class="auth-actions"><button class="button secondary" id="authorizeTelegram" type="button"><i class="fa-solid fa-qrcode"></i>Authorize with QR</button><button class="button danger" id="signOutTelegram" type="button"><i class="fa-solid fa-right-from-bracket"></i>Sign out locally</button></div><img id="telegramQr" alt="Telegram authorization QR code" hidden style="display:none"><div id="telegramPasswordArea"></div></div></section>
+              <section id="setupX" class="component-card setup-section"><div class="card-title"><div><span>Official X API v2</span><h2>Account post monitoring</h2></div><code id="xConfigured">Not configured</code></div><div class="source-editor"><label><span>X handle or profile URL</span><div class="input-action"><input id="newXSource" placeholder="@jdncrtr or https://x.com/slace98"><button type="button" id="addXSource"><i class="fa-solid fa-plus"></i>Add</button></div></label><div id="xSourceEditor" class="source-chips"></div></div><div class="form-fields"><label class="wide"><span>Bearer token</span><input id="xBearerToken" type="password" autocomplete="off" placeholder="Paste to save locally"></label><label class="check-field wide"><input id="xEnabled" type="checkbox"><span>Start official X monitoring after setup is saved.</span></label><label class="check-field wide"><input id="clearXBearerToken" type="checkbox"><span>Clear the saved bearer token when setup is saved.</span></label></div><p class="provider-note"><i class="fa-solid fa-circle-info"></i>Checks up to 5 newest posts per account every 5 minutes. X API access is user-funded pay-per-use; Trade-Pinger never purchases credits, changes billing, or enables auto-recharge.</p></section>
               <section id="setupTwilio" class="component-card setup-section"><div class="card-title"><div><span>Twilio</span><h2>Optional SMS alerts</h2></div><code id="twilioConfigured">Not configured</code></div><div class="form-fields"><label><span>Account SID</span><input id="twilioAccountSid" type="password" autocomplete="off"></label><label><span>Auth token</span><input id="twilioAuthToken" type="password" autocomplete="off"></label><label><span>Twilio from number</span><input id="twilioFromNumber" type="password" autocomplete="off"></label><label><span>SMS destination</span><input id="smsToNumber" type="password" autocomplete="off"></label></div></section>
               <section id="setupDiscord" class="component-card setup-section"><div class="card-title"><div><span>Discord</span><h2>Webhook alerts</h2></div><code id="discordConfigured">Not configured</code></div><div class="form-fields"><label class="wide"><span>Discord webhook URL</span><input id="discordWebhookUrl" type="password" autocomplete="off" placeholder="Paste your regenerated webhook locally"></label><label class="check-field wide"><input id="clearDiscordWebhook" type="checkbox"><span>Clear the saved webhook when setup is saved.</span></label></div><p class="provider-note"><i class="fa-solid fa-bell"></i>Every new monitored post intentionally sends <strong>@everyone</strong>, complete text, source, timestamp, link when available, and supported media to this webhook.</p></section>
               <section id="setupAlerts" class="component-card setup-section"><div class="card-title"><div><span>Windows</span><h2>New-post alerts</h2></div><code>Local only</code></div><div class="form-fields"><label class="check-field wide"><input id="desktopNotifications" type="checkbox"><span>Show a native Windows notification with the channel and a short post preview.</span></label><label class="check-field wide"><input id="notificationSound" type="checkbox"><span>Play a local notification sound for each genuinely new post.</span></label></div><p class="provider-note"><i class="fa-solid fa-circle-info"></i>Startup history and duplicate Telegram events do not trigger these alerts. Clicking a supported Windows notification focuses Trade-Pinger.</p></section>

@@ -1,5 +1,5 @@
 let latestStatus;
-let setupConfig = { telegramSources: [], coinWatchlist: [], configured: {} };
+let setupConfig = { telegramSources: [], xSources: [], coinWatchlist: [], configured: {} };
 
 function dateTime(value) {
   return value ? new Date(value).toLocaleString() : 'Never';
@@ -12,27 +12,30 @@ function escapeHtml(value) {
 }
 
 function sourceLink(source) {
-  return source.startsWith('@') ? `https://t.me/${source.slice(1)}` : '';
+  if (source.network === 'X') return `https://x.com/${source.source.slice(1)}`;
+  return source.source.startsWith('@') ? `https://t.me/${source.source.slice(1)}` : '';
 }
 
 function render(status) {
   latestStatus = status;
   const provider = status.providers.Telegram;
-  const hasError = status.errors.length > 0 || status.sourceErrors.length > 0;
-  document.querySelector('#liveDot').className = `status-dot ${hasError ? 'error' : provider.connected ? '' : 'idle'}`;
-  document.querySelector('#liveLabel').textContent = provider.connected ? 'Telegram live' : provider.authorizing ? 'Authorization pending' : 'Waiting for setup';
-  document.querySelector('#liveMode').textContent = hasError ? 'Connection needs attention' : provider.message;
-  document.querySelector('#providerCards').innerHTML = `<article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-telegram"></i></span><div><strong>Telegram personal account</strong><small>${escapeHtml(provider.mode)} · Last check: ${dateTime(provider.lastSuccess)}</small></div><span class="provider-state ${provider.connected ? 'connected' : ''}">${provider.connected ? 'Listening' : provider.authorized ? 'Reconnect needed' : 'Needs authorization'}</span></article>`;
+  const xProvider = status.providers.X;
+  const hasError = status.errors.length > 0 || status.sourceErrors.length > 0 || Boolean(xProvider.error);
+  const anyLive = provider.connected || xProvider.connected;
+  document.querySelector('#liveDot').className = `status-dot ${hasError ? 'error' : anyLive ? '' : 'idle'}`;
+  document.querySelector('#liveLabel').textContent = anyLive ? 'Monitoring live' : provider.authorizing ? 'Authorization pending' : 'Waiting for setup';
+  document.querySelector('#liveMode').textContent = hasError ? 'Connection needs attention' : `Telegram: ${provider.message} X: ${xProvider.message}`;
+  document.querySelector('#providerCards').innerHTML = `<article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-telegram"></i></span><div><strong>Telegram personal account</strong><small>${escapeHtml(provider.mode)} · Last check: ${dateTime(provider.lastSuccess)}</small></div><span class="provider-state ${provider.connected ? 'connected' : ''}">${provider.connected ? 'Listening' : provider.authorized ? 'Reconnect needed' : 'Needs authorization'}</span></article><article class="provider-card"><span class="provider-icon"><i class="fa-brands fa-x-twitter"></i></span><div><strong>Official X API</strong><small>${escapeHtml(xProvider.mode)} · Last check: ${dateTime(xProvider.lastSuccess)}</small></div><span class="provider-state ${xProvider.connected ? 'connected' : ''}">${xProvider.connected ? 'Polling' : xProvider.enabled ? 'Needs attention' : 'Stopped'}</span></article>`;
   document.querySelector('#stats').innerHTML = `<div><strong>${dateTime(status.lastPoll)}</strong><span>Last successful Telegram check</span></div><div><strong>${dateTime(status.lastAlert)}</strong><span>Last alert / ping</span></div><div><strong>${status.discordConfigured ? 'Discord ready' : status.smsConfigured ? 'SMS ready' : 'Needs setup'}</strong><span>Alert delivery</span></div>`;
   document.querySelector('#postCount').textContent = `${status.posts.length} post${status.posts.length === 1 ? '' : 's'}`;
-  document.querySelector('#posts').innerHTML = status.posts.length ? status.posts.map(post => `<article class="post"><span class="post-icon"><i class="fa-brands fa-telegram"></i></span><div><div class="post-meta"><strong>${escapeHtml(post.source)}</strong><span>${dateTime(post.createdAt)}</span></div><p>${escapeHtml(post.text)}</p>${post.media ? `<small>${post.media.attached ? 'Media forwarded to Discord' : post.media.tooLarge ? 'Media exceeded local forwarding limit' : 'Media was unavailable'}</small>` : ''}</div>${post.link ? `<a href="${escapeHtml(post.link)}" target="_blank" rel="noreferrer" title="Open post"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ''}</article>`).join('') : '<div class="empty"><i class="fa-solid fa-satellite-dish"></i><p>No new posts since listening started.</p></div>';
+  document.querySelector('#posts').innerHTML = status.posts.length ? status.posts.map(post => `<article class="post"><span class="post-icon"><i class="fa-brands ${post.network === 'X' ? 'fa-x-twitter' : 'fa-telegram'}"></i></span><div><div class="post-meta"><strong>${escapeHtml(post.source)}</strong><span>${dateTime(post.createdAt)}</span></div><p>${escapeHtml(post.text)}</p>${post.media ? `<small>${post.media.attached ? 'Media forwarded to Discord' : post.media.tooLarge ? 'Media exceeded local forwarding limit' : 'Media was unavailable'}</small>` : ''}</div>${post.link ? `<a href="${escapeHtml(post.link)}" target="_blank" rel="noreferrer" title="Open post"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ''}</article>`).join('') : '<div class="empty"><i class="fa-solid fa-satellite-dish"></i><p>No new posts since monitoring started.</p></div>';
   document.querySelector('#sources').innerHTML = status.sources.length ? status.sources.map(source => {
-    const link = sourceLink(source.source);
+    const link = sourceLink(source);
     const name = escapeHtml(source.source);
     const diagnostic = source.diagnostic;
-    const status = source.error || (diagnostic ? `Handler registered · received ${diagnostic.received} · accepted ${diagnostic.accepted}` : source.configured ? 'Resolving source' : 'Needs authorization');
-    return `<div class="source"><span class="source-icon"><i class="fa-brands fa-telegram"></i></span>${link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : `<span>${name}</span>`}<small class="${source.error ? 'source-error' : diagnostic?.registered ? 'ready' : ''}">${escapeHtml(status)}</small></div>`;
-  }).join('') : '<div class="empty">No Telegram sources configured.</div>';
+    const sourceStatus = source.error || (source.network === 'X' ? (source.configured ? 'Official API source' : 'Bearer token needed') : diagnostic ? `Handler registered · received ${diagnostic.received} · accepted ${diagnostic.accepted}` : source.configured ? 'Resolving source' : 'Needs authorization');
+    return `<div class="source"><span class="source-icon"><i class="fa-brands ${source.network === 'X' ? 'fa-x-twitter' : 'fa-telegram'}"></i></span>${link ? `<a href="${link}" target="_blank" rel="noreferrer">${name}</a>` : `<span>${name}</span>`}<small class="${source.error ? 'source-error' : diagnostic?.registered || source.network === 'X' && source.configured ? 'ready' : ''}">${escapeHtml(sourceStatus)}</small></div>`;
+  }).join('') : '<div class="empty">No monitored sources configured.</div>';
   renderMarkets(status.marketSnapshots || []);
   renderRisk(status.marketSnapshots || []);
   renderAuth(provider);
@@ -48,17 +51,20 @@ document.querySelectorAll('.nav-item').forEach(button => button.addEventListener
 function renderSetup() {
   document.querySelector('#telegramApiId').value = setupConfig.telegramApiId || '';
   document.querySelector('#telegramConfigured').textContent = setupConfig.configured.telegramSession ? 'Authorized' : setupConfig.configured.telegram ? 'Credentials saved' : 'Not configured';
+  document.querySelector('#xConfigured').textContent = setupConfig.configured.x ? (setupConfig.xEnabled ? 'Active' : 'Token saved') : 'Not configured';
+  document.querySelector('#xEnabled').checked = setupConfig.xEnabled === true;
   document.querySelector('#twilioConfigured').textContent = setupConfig.configured.twilio ? 'Configured' : 'Not configured';
   document.querySelector('#discordConfigured').textContent = setupConfig.configured.discord ? 'Configured' : 'Not configured';
   document.querySelector('#desktopNotifications').checked = setupConfig.desktopNotifications !== false;
   document.querySelector('#notificationSound').checked = setupConfig.notificationSound !== false;
-  const secretFields = ['telegramApiHash', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl'];
+  const secretFields = ['telegramApiHash', 'xBearerToken', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl'];
   secretFields.forEach(id => {
     const input = document.querySelector(`#${id}`);
     input.value = '';
     input.placeholder = setupConfig.configured[id] ? 'Saved locally — enter a new value to replace' : id.includes('Number') ? '+15551234567' : 'Paste to save locally';
   });
   document.querySelector('#telegramSourceEditor').innerHTML = setupConfig.telegramSources.map((source, index) => `<span class="source-chip"><i class="fa-brands fa-telegram"></i>${escapeHtml(source)}<button type="button" data-remove-source data-index="${index}" title="Remove"><i class="fa-solid fa-xmark"></i></button></span>`).join('');
+  document.querySelector('#xSourceEditor').innerHTML = setupConfig.xSources.map((source, index) => `<span class="source-chip"><i class="fa-brands fa-x-twitter"></i>${escapeHtml(source)}<button type="button" data-remove-x-source data-index="${index}" title="Remove"><i class="fa-solid fa-xmark"></i></button></span>`).join('');
   document.querySelector('#coinEditor').innerHTML = setupConfig.coinWatchlist.map((coin, index) => `<span class="source-chip"><i class="fa-solid fa-coins"></i>${escapeHtml(coin)}<button type="button" data-remove-coin data-index="${index}" title="Remove"><i class="fa-solid fa-xmark"></i></button></span>`).join('');
 }
 
@@ -127,6 +133,13 @@ document.querySelector('#addCoin').addEventListener('click', () => {
   input.value = '';
   renderSetup();
 });
+document.querySelector('#addXSource').addEventListener('click', () => {
+  const input = document.querySelector('#newXSource');
+  if (!input.value.trim()) return;
+  setupConfig.xSources.push(input.value.trim());
+  input.value = '';
+  renderSetup();
+});
 document.querySelectorAll('[data-setup-panel]').forEach(button => button.addEventListener('click', () => {
   document.querySelectorAll('[data-setup-panel],.setup-section').forEach(item => item.classList.remove('active'));
   button.classList.add('active');
@@ -135,9 +148,11 @@ document.querySelectorAll('[data-setup-panel]').forEach(button => button.addEven
 document.querySelector('#setupForm').addEventListener('click', event => {
   const sourceButton = event.target.closest('[data-remove-source]');
   const coinButton = event.target.closest('[data-remove-coin]');
+  const xButton = event.target.closest('[data-remove-x-source]');
   if (sourceButton) setupConfig.telegramSources.splice(Number(sourceButton.dataset.index), 1);
   if (coinButton) setupConfig.coinWatchlist.splice(Number(coinButton.dataset.index), 1);
-  if (sourceButton || coinButton) renderSetup();
+  if (xButton) setupConfig.xSources.splice(Number(xButton.dataset.index), 1);
+  if (sourceButton || coinButton || xButton) renderSetup();
 });
 
 document.querySelector('#setupForm').addEventListener('submit', async event => {
@@ -148,6 +163,10 @@ document.querySelector('#setupForm').addEventListener('submit', async event => {
     telegramApiId: document.querySelector('#telegramApiId').value,
     telegramApiHash: document.querySelector('#telegramApiHash').value,
     telegramSources: setupConfig.telegramSources,
+    xSources: setupConfig.xSources,
+    xBearerToken: document.querySelector('#xBearerToken').value,
+    xEnabled: document.querySelector('#xEnabled').checked,
+    clearXBearerToken: document.querySelector('#clearXBearerToken').checked,
     coinWatchlist: setupConfig.coinWatchlist,
     desktopNotifications: document.querySelector('#desktopNotifications').checked,
     notificationSound: document.querySelector('#notificationSound').checked,
@@ -167,6 +186,7 @@ document.querySelector('#setupForm').addEventListener('submit', async event => {
   }
   setupConfig = result.config;
   document.querySelector('#clearDiscordWebhook').checked = false;
+  document.querySelector('#clearXBearerToken').checked = false;
   renderSetup();
   document.querySelector('#saveState').textContent = `Saved locally at ${new Date().toLocaleTimeString()}`;
 });

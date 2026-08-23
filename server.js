@@ -6,6 +6,7 @@ const path = require('path');
 const QRCode = require('qrcode');
 const twilio = require('twilio');
 const { TelegramListener, normalizeTelegramSource } = require('./telegram-listener');
+const { XMonitor, normalizeXSource } = require('./x-monitor');
 const { sendDiscord } = require('./discord-alert');
 const LocalSecrets = require('./local-secrets');
 
@@ -36,6 +37,9 @@ let config = {
   telegramApiId: saved.telegramApiId || process.env.TELEGRAM_API_ID || '',
   telegramApiHash: localSecrets.telegramApiHash || saved.telegramApiHash || process.env.TELEGRAM_API_HASH || '',
   telegramSources: migratedSources.map(normalizeTelegramSource),
+  xBearerToken: localSecrets.xBearerToken || '',
+  xSources: (saved.xSources || ['@jdncrtr', '@slace98']).map(normalizeXSource),
+  xEnabled: saved.xEnabled === true,
   discordWebhookUrl: localSecrets.discordWebhookUrl || saved.discordWebhookUrl || '',
   twilioAccountSid: localSecrets.twilioAccountSid || saved.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID || '',
   twilioAuthToken: localSecrets.twilioAuthToken || saved.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN || '',
@@ -47,12 +51,13 @@ let config = {
 };
 let state = {
   seen: [], posts: [], lastAlert: null, errors: [], sourceErrors: [], listenerDiagnostics: [],
-  telegram: { connected: false, authorized: false, authorizing: false, lastSuccess: null, message: 'Waiting for setup.' }
+  telegram: { connected: false, authorized: false, authorizing: false, lastSuccess: null, message: 'Waiting for setup.' },
+  x: { connected: false, checking: false, lastSuccess: null, error: null, message: 'Official X monitoring is stopped.' }
 };
 if (fs.existsSync(stateFile)) {
   const previous = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
   state.seen = previous.seen || [];
-  state.posts = (previous.posts || []).filter(post => post.network === 'Telegram');
+  state.posts = (previous.posts || []).filter(post => ['Telegram', 'X'].includes(post.network));
   state.lastAlert = previous.lastAlert || null;
 }
 let marketSnapshots = [];
@@ -66,11 +71,11 @@ function saveJson(file, value) {
 
 function saveConfig() {
   saveJson(configFile, {
-    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, coinWatchlist: config.coinWatchlist,
+    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, xSources: config.xSources, xEnabled: config.xEnabled, coinWatchlist: config.coinWatchlist,
     desktopNotifications: config.desktopNotifications, notificationSound: config.notificationSound
   });
   secretStore.save({
-    telegramApiHash: config.telegramApiHash, discordWebhookUrl: config.discordWebhookUrl,
+    telegramApiHash: config.telegramApiHash, xBearerToken: config.xBearerToken, discordWebhookUrl: config.discordWebhookUrl,
     twilioAccountSid: config.twilioAccountSid, twilioAuthToken: config.twilioAuthToken,
     twilioFromNumber: config.twilioFromNumber, smsToNumber: config.smsToNumber
   });
@@ -82,6 +87,8 @@ function configured() {
     telegramApiId: Boolean(config.telegramApiId),
     telegramApiHash: Boolean(config.telegramApiHash),
     telegramSession: fs.existsSync(sessionFile),
+    x: Boolean(config.xBearerToken),
+    xBearerToken: Boolean(config.xBearerToken),
     discord: Boolean(config.discordWebhookUrl),
     discordWebhookUrl: Boolean(config.discordWebhookUrl),
     twilio: Boolean(config.twilioAccountSid && config.twilioAuthToken && config.twilioFromNumber && config.smsToNumber),
@@ -94,7 +101,7 @@ function configured() {
 
 function publicConfig() {
   return {
-    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, coinWatchlist: config.coinWatchlist,
+    telegramApiId: config.telegramApiId, telegramSources: config.telegramSources, xSources: config.xSources, xEnabled: config.xEnabled, coinWatchlist: config.coinWatchlist,
     desktopNotifications: config.desktopNotifications, notificationSound: config.notificationSound, configured: configured()
   };
 }
@@ -105,13 +112,13 @@ function statusPayload() {
       const error = state.sourceErrors.find(item => item.source === source);
       const diagnostic = state.listenerDiagnostics.find(item => item.source === source);
       return { network: 'Telegram', source, label: source, configured: configured().telegramSession, error: error?.message || null, diagnostic: diagnostic || null };
-    }),
+    }).concat(config.xSources.map(source => ({ network: 'X', source, label: source, configured: configured().x, error: state.x.error }))),
     posts: state.posts,
     lastPoll: state.telegram.lastSuccess,
     lastAlert: state.lastAlert,
     errors: state.errors,
     sourceErrors: state.sourceErrors,
-    providers: { Telegram: { ...state.telegram, mode: 'Personal account live updates' } },
+    providers: { Telegram: { ...state.telegram, mode: 'Personal account live updates' }, X: { ...state.x, enabled: config.xEnabled, configured: configured().x, mode: 'Official API v2 · 5-minute polling' } },
     smsConfigured: configured().twilio,
     discordConfigured: configured().discord,
     marketSnapshots
@@ -167,10 +174,19 @@ const listener = new TelegramListener({
   onDiagnostics: diagnostics => { state.listenerDiagnostics = diagnostics.map(item => ({ ...item })); publish(); }
 });
 
+const xMonitor = new XMonitor({
+  onPost: addPost,
+  onState: update => { state.x = { ...state.x, ...update }; publish(); }
+});
+
 async function restartTelegram() {
   state.errors = [];
   state.sourceErrors = [];
   await listener.start(config.telegramApiId, config.telegramApiHash, config.telegramSources);
+}
+
+function restartX() {
+  xMonitor.start(config.xBearerToken, config.xSources, config.xEnabled);
 }
 
 function marketView(coin, pair) {
@@ -229,21 +245,26 @@ app.post('/api/config', async (request, response) => {
       ...config,
       telegramApiId: String(input.telegramApiId ?? config.telegramApiId).trim(),
       telegramSources: [...new Set((input.telegramSources || []).map(normalizeTelegramSource))],
+      xSources: [...new Set((input.xSources || []).map(normalizeXSource))],
+      xEnabled: input.xEnabled === true,
       coinWatchlist: [...new Set((input.coinWatchlist || []).map(normalizeCoin))],
       desktopNotifications: input.desktopNotifications !== false,
       notificationSound: input.notificationSound !== false
     };
     if (next.telegramApiId && !/^\d+$/.test(next.telegramApiId)) throw new Error('Telegram API ID must contain only digits.');
     if (next.telegramSources.length > 50) throw new Error('Telegram monitoring supports up to 50 sources.');
+    if (next.xSources.length > 20) throw new Error('X monitoring supports up to 20 handles.');
     if (next.coinWatchlist.length > 20) throw new Error('Coin watchlist supports up to 20 entries.');
-    for (const key of ['telegramApiHash', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl']) {
+    for (const key of ['telegramApiHash', 'xBearerToken', 'twilioAccountSid', 'twilioAuthToken', 'twilioFromNumber', 'smsToNumber', 'discordWebhookUrl']) {
       if (typeof input[key] === 'string' && input[key].trim()) next[key] = input[key].trim();
     }
     if (input.clearDiscordWebhook) next.discordWebhookUrl = '';
+    if (input.clearXBearerToken) next.xBearerToken = '';
     if (next.discordWebhookUrl && !/^https:\/\/(?:canary\.|ptb\.)?(?:discord(?:app)?\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9._-]+$/.test(next.discordWebhookUrl)) throw new Error('Enter an official Discord webhook URL.');
     config = next;
     saveConfig();
     await restartTelegram();
+    restartX();
     refreshMarkets();
     response.json({ saved: true, config: publicConfig() });
   } catch (error) {
@@ -274,7 +295,7 @@ app.post('/api/telegram/signout', async (request, response) => {
 });
 
 app.post('/api/check', async (request, response) => {
-  try { response.json({ ok: await listener.check() }); }
+  try { response.json({ ok: await listener.check(), x: await xMonitor.poll() }); }
   catch (error) { rememberError('Telegram', error); response.json({ ok: false }); }
 });
 
@@ -282,10 +303,11 @@ const server = app.listen(port, () => {
   console.log(`Trade-Pinger service running at http://localhost:${port}`);
   saveConfig();
   restartTelegram();
+  restartX();
   refreshMarkets();
   setInterval(() => listener.check().catch(error => rememberError('Telegram', error)), 30000);
   setInterval(refreshMarkets, 60000);
 });
 
-server.on('close', () => listener.disconnect());
+server.on('close', () => { listener.disconnect(); xMonitor.stop(); });
 module.exports = server;

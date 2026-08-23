@@ -1,5 +1,7 @@
 function safePostLink(value) {
-  return /^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/\d+$/.test(value || '') ? value : null;
+  if (/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/\d+$/.test(value || '')) return value;
+  if (/^https:\/\/x\.com\/[A-Za-z0-9_]{1,15}\/status\/\d+$/.test(value || '')) return value;
+  return null;
 }
 
 function mediaContext(post) {
@@ -16,12 +18,12 @@ function discordPayloads(post) {
   const link = safePostLink(post.link);
   return chunks.map((description, index) => {
     const embed = {
-      title: `New Telegram post · ${post.source}`.slice(0, 256),
+      title: `New ${post.network || 'Telegram'} post · ${post.source}`.slice(0, 256),
       description,
       color: 0x4ba0e8,
       fields: index === 0 ? [
-        { name: 'Source', value: String(post.source || 'Telegram source').slice(0, 1024), inline: true },
-        { name: 'Provider', value: 'Telegram', inline: true },
+        { name: 'Source', value: String(post.source || 'Monitored source').slice(0, 1024), inline: true },
+        { name: 'Provider', value: String(post.network || 'Telegram').slice(0, 1024), inline: true },
         { name: 'Media', value: mediaContext(post), inline: false }
       ] : [],
       footer: { text: chunks.length === 1 ? 'Trade-Pinger · New post' : `Trade-Pinger · Part ${index + 1} of ${chunks.length}` }

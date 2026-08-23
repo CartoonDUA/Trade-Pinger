@@ -1,6 +1,6 @@
 # Trade-Pinger
 
-Trade-Pinger is a user-owned Windows desktop app for personal-account Telegram channel monitoring, Discord and optional SMS alerts, neutral Solana market snapshots, and human-reviewed Phantom proposals.
+Trade-Pinger is a user-owned Windows desktop app for personal-account Telegram and official X API monitoring, Discord and optional SMS alerts, neutral Solana market snapshots, and human-reviewed Phantom proposals.
 
 It never asks for a wallet recovery phrase or private key. It never creates, submits, broadcasts, or automatically executes a trade.
 
@@ -30,6 +30,14 @@ The Sources view shows content-free listener diagnostics for each resolved sourc
 
 Monitoring begins after the live handlers are registered. Existing messages are not fetched or alerted. Newly delivered messages appear in Live Feed with their Telegram timestamp, source identity, full text, link when a public username permits one, and media status.
 
+## Official X setup
+
+Trade-Pinger uses only documented X API v2 requests. In **Setup → X**, add handles or `x.com` profile URLs, paste your bearer token locally, enable monitoring, and save. `@jdncrtr` and `@slace98` are the initial local source list. The token is write-only and protected with Electron safe storage; it is never returned by the local API or shown again. X documents the [user Post timeline endpoint](https://docs.x.com/x-api/users/get-posts) used by this integration.
+
+Monitoring is deliberately off until a bearer token is saved and **Start official X monitoring** is checked. Once active, Trade-Pinger resolves each username through `GET /2/users/by/username/:username` and checks up to five newest posts through `GET /2/users/:id/tweets` every five minutes. The first successful response establishes a baseline and produces no alerts, including after an app restart. Later post IDs pass through the same duplicate guard, Live Feed, Discord `@everyone` embed, optional SMS, and Windows notification/sound path as Telegram. The top-right refresh button performs a manual provider check.
+
+The official X API currently has no free access for this use and uses [user-funded pay-per-use credits](https://docs.x.com/x-api/fundamentals/post-cap). Availability and per-endpoint cost are shown in the user's X Developer Console. Trade-Pinger never buys credits, enters payment information, enables auto-recharge, or changes billing/spend limits. If credentials or credits are unavailable, leave X monitoring stopped; Telegram and the other local features continue normally.
+
 ## Windows new-post alerts
 
 **Setup → Alerts** controls native desktop notifications and the local notification sound. Both default on. Each genuinely new post can show the source and a whitespace-normalized preview limited to 140 characters; clicking the notification focuses Trade-Pinger when Windows supports the action. The existing listener-start cutoff and seen-message ID guard prevent startup history and duplicate events from producing repeated desktop alerts.
@@ -38,7 +46,7 @@ Windows Focus Assist, Do Not Disturb, per-app notification permissions, or disab
 
 ## Discord alerts
 
-Create a webhook for a Discord channel you control and save it under **Setup → Discord**. Each new monitored Telegram post intentionally includes `@everyone` followed by a rich embed with the source, Telegram timestamp, complete text, media context, and a validated public `t.me` post link when available. Long text is continued across additional rich embeds instead of being silently truncated. Available media up to the app’s 8 MB forwarding limit is attached to the first payload. Discord availability and its own webhook limits still apply.
+Create a webhook for a Discord channel you control and save it under **Setup → Discord**. Each new monitored Telegram or X post intentionally includes `@everyone` followed by a rich embed with the provider, source, timestamp, complete text, media context, and a validated public post link when available. Long text is continued across additional rich embeds instead of being silently truncated. Available Telegram media up to the app’s 8 MB forwarding limit is attached to the first payload. Discord availability and its own webhook limits still apply.
 
 Webhook values are write-only. If a webhook was pasted into chat or exposed elsewhere, revoke it first and enter a regenerated replacement directly in Trade-Pinger.
 

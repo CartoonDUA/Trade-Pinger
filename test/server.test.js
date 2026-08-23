@@ -3,11 +3,64 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const { discordPayloads, safePostLink, sendDiscord } = require('../discord-alert');
 const { TelegramListener, normalizeTelegramSource, messageTime } = require('../telegram-listener');
+const { XMonitor, normalizeXSource } = require('../x-monitor');
 
-test('legacy social provider is absent from application files', () => {
-  const files = ['server.js', 'public/app.js', 'public/index.html', '.env.example', 'README.md'];
-  const source = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
-  assert.doesNotMatch(source, /X_BEARER_TOKEN|X_STREAM_ENABLED|normalizeXSource|x\.com|tweets\/search|fa-x-twitter/);
+test('X source normalization accepts handles and official profile URLs', () => {
+  assert.equal(normalizeXSource('@jdncrtr'), '@jdncrtr');
+  assert.equal(normalizeXSource('https://x.com/slace98'), '@slace98');
+  assert.throws(() => normalizeXSource('https://example.com/jdncrtr'));
+});
+
+test('X monitor establishes a no-alert baseline then routes new posts once', async () => {
+  const posts = [];
+  const responses = [
+    { data: { id: '42' } },
+    { data: [{ id: '100', text: 'baseline', created_at: '2026-08-23T10:00:00.000Z' }] },
+    { data: [{ id: '101', text: 'new post', created_at: '2026-08-23T10:05:00.000Z' }] },
+    { data: [{ id: '101', text: 'duplicate event', created_at: '2026-08-23T10:05:00.000Z' }] }
+  ];
+  const urls = [];
+  const fetcher = async (url, options) => {
+    urls.push(url);
+    assert.match(options.headers.Authorization, /^Bearer /);
+    return { ok: true, json: async () => responses.shift() };
+  };
+  const seen = new Set();
+  const monitor = new XMonitor({
+    fetcher,
+    onState() {},
+    onPost(post) {
+      if (seen.has(post.id)) return false;
+      seen.add(post.id);
+      posts.push(post);
+      return true;
+    }
+  });
+  monitor.token = 'test-token-not-real';
+  monitor.handles = ['@jdncrtr'];
+  monitor.running = true;
+  await monitor.poll();
+  assert.equal(posts.length, 0);
+  await monitor.poll();
+  assert.deepEqual(posts.map(post => post.id), ['X:101']);
+  assert.equal(posts[0].network, 'X');
+  assert.equal(posts[0].link, 'https://x.com/jdncrtr/status/101');
+  await monitor.poll();
+  assert.equal(posts.length, 1);
+  assert.match(urls[2], /since_id=100/);
+  monitor.stop();
+});
+
+test('X uses the generic alert pipeline and write-only desktop setup', () => {
+  const server = fs.readFileSync('server.js', 'utf8');
+  const client = fs.readFileSync('public/app.js', 'utf8');
+  const setup = fs.readFileSync('public/index.html', 'utf8');
+  assert.match(server, /const xMonitor = new XMonitor\(\{\s*onPost: addPost/);
+  assert.match(server, /xSources: config\.xSources, xEnabled: config\.xEnabled/);
+  assert.match(client, /xBearerToken.*type="password"|secretFields = \[[^\]]*'xBearerToken'/s);
+  assert.match(setup, /id="xBearerToken" type="password"/);
+  assert.match(setup, /fa-x-twitter/);
+  assert.doesNotMatch(`${server}\n${client}\n${setup}`, /nitter|syndication|X_BEARER_TOKEN|X_STREAM_ENABLED/i);
 });
 
 test('Telegram source normalization accepts every supported form', () => {
@@ -104,6 +157,7 @@ test('Discord embeds preserve long text and reject unsafe links', () => {
   assert.equal(payloads[0].embeds[0].timestamp, undefined);
   assert.match(payloads[0].embeds[0].fields[2].value, /8 MB/);
   assert.equal(safePostLink('https://t.me/source/7'), 'https://t.me/source/7');
+  assert.equal(safePostLink('https://x.com/jdncrtr/status/7'), 'https://x.com/jdncrtr/status/7');
   assert.equal(safePostLink('https://t.me/+private/7'), null);
 });
 
@@ -125,11 +179,12 @@ test('Discord sender posts rich embeds without using a real webhook', async () =
   assert.equal(requests[0].payload.embeds[0].description, 'new post');
 });
 
-test('local secrets and Telegram session are never returned by public config', () => {
+test('local secrets, X token, and Telegram session are never returned by public config', () => {
   const server = fs.readFileSync('server.js', 'utf8');
   const secrets = fs.readFileSync('local-secrets.js', 'utf8');
   const publicConfig = server.match(/function publicConfig\(\) \{([\s\S]*?)\n\}/)[1];
-  assert.doesNotMatch(publicConfig, /telegramApiHash:\s*config|discordWebhookUrl:\s*config|telegram\.session/);
+  assert.doesNotMatch(publicConfig, /telegramApiHash:\s*config|xBearerToken:\s*config|discordWebhookUrl:\s*config|telegram\.session/);
+  assert.match(server, /xBearerToken: config\.xBearerToken/);
   assert.match(server, /dataDir, 'telegram\.session'/);
   assert.match(server, /desktopNotifications: config\.desktopNotifications, notificationSound: config\.notificationSound/);
   assert.match(secrets, /safeStorage\.encryptString/);
