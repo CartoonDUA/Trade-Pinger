@@ -97,6 +97,19 @@ test('Google Drive monitor baselines history and routes each new file once', asy
   monitor.stop();
 });
 
+test('Google Drive listing follows official pagination', async () => {
+  const urls = [];
+  const pages = [{ files: [{ id: 'one' }], nextPageToken: 'next-page' }, { files: [{ id: 'two' }] }];
+  const monitor = new DriveMonitor({ onFile() {}, onState() {}, onCredentials() {}, fetcher: async url => {
+    urls.push(url);
+    return { ok: true, json: async () => pages.shift() };
+  } });
+  Object.assign(monitor, { folderId: 'folder-id-123', accessToken: 'mock-access', expiresAt: Date.now() + 3600000 });
+  assert.deepEqual((await monitor.listFiles()).map(file => file.id), ['one', 'two']);
+  assert.doesNotMatch(urls[0], /pageToken=/);
+  assert.match(urls[1], /pageToken=next-page/);
+});
+
 test('Google Drive Discord payload is rich, scoped, and mocked', async () => {
   const post = { createdAt: '2026-08-23T10:01:00.000Z', link: 'https://drive.google.com/file/d/new/view', drive: { name: 'Report.pdf', mimeType: 'application/pdf', folderId: 'folder-id-123', modifiedTime: '2026-08-23T10:02:00.000Z' } };
   const payload = driveDiscordPayload(post);

@@ -62,15 +62,24 @@ class DriveMonitor {
   }
 
   async listFiles() {
-    const params = new URLSearchParams({
-      q: `'${this.folderId}' in parents and trashed = false`,
-      fields: 'files(id,name,mimeType,createdTime,modifiedTime,webViewLink)',
-      orderBy: 'createdTime desc',
-      pageSize: '100'
-    });
-    const response = await this.fetcher(`https://www.googleapis.com/drive/v3/files?${params}`, { headers: { Authorization: `Bearer ${await this.token()}` } });
-    if (!response.ok) throw new Error(`Google Drive API returned ${response.status}`);
-    return (await response.json()).files || [];
+    const accessToken = await this.token();
+    const files = [];
+    let pageToken;
+    do {
+      const params = new URLSearchParams({
+        q: `'${this.folderId}' in parents and trashed = false`,
+        fields: 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,webViewLink)',
+        orderBy: 'createdTime desc',
+        pageSize: '100'
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+      const response = await this.fetcher(`https://www.googleapis.com/drive/v3/files?${params}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!response.ok) throw new Error(`Google Drive API returned ${response.status}`);
+      const result = await response.json();
+      files.push(...(result.files || []));
+      pageToken = result.nextPageToken;
+    } while (pageToken);
+    return files;
   }
 
   async poll() {
